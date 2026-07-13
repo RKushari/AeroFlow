@@ -62,13 +62,9 @@ export async function generateAiBriefing(flightId: string) {
     draftContent = "[AI GENERATION FAILED] Network or API error occurred. Please write manually.";
   }
 
-  const briefing = await db.safetyBriefings.upsert({
-    where: { flightId },
-    create: {
+  const briefing = await db.safetyBriefings.create({
+    data: {
       flightId,
-      draftContent,
-    },
-    update: {
       draftContent,
     }
   });
@@ -80,8 +76,15 @@ export async function approveBriefing(data: any) {
   const session = await requireRole(['FLIGHT_DISPATCHER', 'OPERATIONS_DIRECTOR']);
   const parsed = AiBriefingSchema.parse(data);
 
+  const latest = await db.safetyBriefings.findFirst({
+    where: { flightId: parsed.flightId, deletedAt: null },
+    orderBy: { id: 'desc' }
+  });
+
+  if (!latest) throw new Error("No active briefing found");
+
   return await db.safetyBriefings.update({
-    where: { flightId: parsed.flightId },
+    where: { id: latest.id },
     data: {
       finalContent: parsed.finalContent,
       isApproved: true,

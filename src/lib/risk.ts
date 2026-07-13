@@ -1,5 +1,7 @@
 import { db } from './db';
 import { Prisma, Severity } from '@prisma/client';
+import { getRiskThreshold } from './config';
+import { eventBus } from './events';
 
 const WEIGHTS = { w1: 0.3, w2: 0.4, w3: 0.3 };
 
@@ -19,41 +21,50 @@ export async function calculateRisk(flightId: string, tx: Prisma.TransactionClie
       checklists: { include: { items: true } },
       weather: { orderBy: { id: 'desc' }, take: 1 },
       incidents: { where: { resolved: false } },
-      crewUsers: {
-        include: {
-          shiftLogs: { orderBy: { startTime: 'desc' }, take: 1 }
-        }
-      }
-    },
+    }
   });
 
   if (!flight) throw new Error('Flight not found');
 
-  // Fs: Fatigue
-  const allCrewLogs = flight.crewUsers.flatMap(u => u.shiftLogs);
-  const Fs = allCrewLogs.length > 0
-    ? allCrewLogs.reduce((acc, log) => acc + log.fatigueIndex, 0) / allCrewLogs.length
-    : 0;
+  // 1. Fatigue (Fs)
+  // Average fatigue index of assigned crew. Default to 0 if none.
+  const crewUsers = await tx.users.findMany({
+    where: { assignedFlights: { some: { id: flightId } } },
+    include: { shiftLogs: { orderBy: { startTime: 'desc' }, take: 1 } }
+  });
 
-  // Wi: Weather
-  const Wi = flight.weather.length > 0 ? flight.weather[0].severityIndex : 0;
+  const shiftLogs = crewUsers.map(u => u.shiftLogs[0]).filter(Boolean);
+  const Fs = shiftLogs.length > 0 
+    ? shiftLogs.reduce((acc, log) => acc + log.fatigueIndex, 0) / shiftLogs.length 
+    : 0.0;
 
-  // Md: Mechanical (Equipment + Checklists)
+  // 2. Weather (Wi)
+  // Severity index from latest weather record. Default to 0 if none.
+  const Wi = flight.weather[0]?.severityIndex ?? 0.0;
+
+  // 3. Mechanical/Checklist (Md)
+  // Max severity of unresolved equipment issues, OR checklist penalty if incomplete.
+  // Checklist penalty: 1.0 if mandatory items incomplete, 0 otherwise.
+  const incompleteMandatory = flight.checklists
+    .flatMap(c => c.items)
+    .filter(i => i.isMandatory && !i.isComplete);
+
+  const checklistPenalty = incompleteMandatory.length > 0 ? 1.0 : 0.0;
+
+  // Equipment status query
   const equipment = await tx.groundEquipment.findMany();
   let maxEqRisk = 0;
   for (const eq of equipment) {
     const r = severityToRiskFactor(eq.status);
     if (r > maxEqRisk) maxEqRisk = r;
   }
-  
-  const incompleteMandatory = flight.checklists.flatMap(c => c.items).filter(i => i.isMandatory && !i.isComplete);
-  const checklistPenalty = incompleteMandatory.length > 0 ? 0.9 : 0;
-  
+
   const Md = Math.max(maxEqRisk, checklistPenalty);
 
-  // Rc = w1 * Fs + w2 * Wi + w3 * Md
+  // Aggregated Score
   const totalScore = (WEIGHTS.w1 * Fs) + (WEIGHTS.w2 * Wi) + (WEIGHTS.w3 * Md);
 
+  // Persist
   const calc = await tx.riskCalculations.upsert({
     where: { flightId },
     create: {
@@ -76,13 +87,22 @@ export async function calculateRisk(flightId: string, tx: Prisma.TransactionClie
   let isCritical = false;
   let blockingReason = '';
   
-  if (totalScore >= 0.75) {
+  const threshold = await getRiskThreshold();
+  
+  if (totalScore >= threshold) {
     isCritical = true;
     blockingReason = 'Critical overall risk score.';
+    eventBus.emit('alert_broadcast', {
+      type: 'RISK_THRESHOLD_FAILURE',
+      flightId,
+      score: totalScore,
+      threshold,
+      timestamp: new Date().toISOString()
+    });
   } else if (flight.incidents.some(i => i.severity === 'CRITICAL')) {
     isCritical = true;
     blockingReason = 'Unresolved critical incident on flight.';
-  } else if (Wi >= 0.75) {
+  } else if (Wi >= threshold) {
     isCritical = true;
     blockingReason = 'Critical weather severity.';
   } else if (incompleteMandatory.length > 0) {

@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { approveDispatch, overrideDispatch } from "@/lib/actions/flight";
 import { requireRole, getSession } from "@/lib/auth";
+import { getRiskThreshold } from "@/lib/config";
+import { RefreshWeatherButton } from "@/components/refresh-weather-button";
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +14,7 @@ export default async function FlightDetails({ params }: { params: { id: string }
     include: {
       risk: true,
       weather: { orderBy: { id: 'desc' }, take: 1 },
-      briefing: true,
+      briefings: { where: { deletedAt: null }, orderBy: { id: 'desc' } },
     }
   });
 
@@ -23,7 +25,8 @@ export default async function FlightDetails({ params }: { params: { id: string }
     return <div className="p-8 text-red-500">Flight not found.</div>;
   }
 
-  const isCritical = flight.risk ? flight.risk.totalScore >= 0.75 : false;
+  const threshold = await getRiskThreshold();
+  const isCritical = flight.risk ? flight.risk.totalScore >= threshold : false;
 
   return (
     <div className="flex flex-col gap-8">
@@ -32,9 +35,11 @@ export default async function FlightDetails({ params }: { params: { id: string }
           <h1 className="text-2xl font-bold">Flight {flight.flightNumber}</h1>
           <p className="text-slate-500">Route: {flight.routeId}</p>
         </div>
-        <div className="flex gap-3">
-          <button className="px-4 py-2 bg-slate-200 rounded-lg text-sm font-medium">Export Dossier (PDF)</button>
-          
+        <div className="flex gap-3 items-start">
+          <RefreshWeatherButton flightId={flight.id} />
+          <a href={`/api/export?flightId=${flight.id}`} target="_blank" className="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg text-sm font-medium transition-colors">
+            Export Dossier (PDF)
+          </a>
           {/* Dispatch Form Server Action */}
           <form action={async () => {
             'use server';
@@ -48,6 +53,21 @@ export default async function FlightDetails({ params }: { params: { id: string }
               Approve Dispatch
             </button>
           </form>
+
+          {flight.status === 'READY' && (
+            <form action={async () => {
+              'use server';
+              const { signoffDeparture } = await import('@/lib/actions/signoff');
+              await signoffDeparture(flight.id);
+            }}>
+              <button 
+                type="submit" 
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold"
+              >
+                Confirm Departure (Sign-off)
+              </button>
+            </form>
+          )}
 
           {isCritical && isDirector && (
             <form action={async (formData: FormData) => {
@@ -94,8 +114,8 @@ export default async function FlightDetails({ params }: { params: { id: string }
             <h2 className="text-lg font-bold">Safety Briefing (AI Draft)</h2>
             <form action={async () => {
               'use server';
-              const { generateAiBriefing } = await import('@/lib/ai');
-              await generateAiBriefing(flight.id);
+              const { regenerateBriefing } = await import('@/lib/actions/briefing');
+              await regenerateBriefing(flight.id);
             }}>
               <button type="submit" className="text-sm text-blue-600 font-medium hover:underline">
                 Generate Draft
@@ -103,16 +123,40 @@ export default async function FlightDetails({ params }: { params: { id: string }
             </form>
           </div>
           
-          {flight.briefing ? (
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-slate-500 uppercase">Draft Content</label>
-              <textarea 
-                className="w-full h-32 p-3 text-sm bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                defaultValue={flight.briefing.draftContent}
-              />
-              <button className="self-end px-3 py-1.5 bg-slate-900 text-white rounded text-sm font-medium mt-2">
-                Commit Briefing
-              </button>
+          {flight.briefings.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-slate-500 uppercase">Latest Draft Content</label>
+                <textarea 
+                  className="w-full h-32 p-3 text-sm bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  defaultValue={flight.briefings[0].draftContent}
+                />
+                <button className="self-end px-3 py-1.5 bg-slate-900 text-white rounded text-sm font-medium mt-2">
+                  Commit Briefing
+                </button>
+              </div>
+              
+              {flight.briefings.length > 1 && (
+                <div className="border-t pt-4 mt-2">
+                  <label className="text-xs font-semibold text-slate-500 uppercase mb-2 block">History</label>
+                  <ul className="space-y-2">
+                    {flight.briefings.slice(1).map((b, idx) => (
+                      <li key={b.id} className="flex justify-between items-center text-sm p-2 bg-slate-50 rounded">
+                        <span className="truncate max-w-xs">{b.draftContent.slice(0, 50)}...</span>
+                        <form action={async () => {
+                          'use server';
+                          const { deleteBriefing } = await import('@/lib/actions/briefing');
+                          await deleteBriefing(b.id, flight.id);
+                        }}>
+                          <button type="submit" className="text-red-500 font-medium text-xs hover:underline">
+                            Delete
+                          </button>
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           ) : (
             <div className="h-32 flex items-center justify-center text-slate-400 text-sm border-2 border-dashed rounded-lg">

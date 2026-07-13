@@ -4,6 +4,8 @@ import { db } from '../db';
 import { requireRole } from '../auth';
 import { logAudit } from '../audit/ledger';
 import { revalidatePath } from 'next/cache';
+import { transitionFlight } from '../flight-lifecycle';
+import { FlightStatus } from '@prisma/client';
 
 export async function completeChecklistItem(itemId: string) {
   const session = await requireRole(['GROUND_CREW_LEAD']);
@@ -40,6 +42,9 @@ export async function completeChecklistItem(itemId: string) {
         where: { id: item.checklistId },
         data: { isComplete: true }
       });
+
+      // Auto-transition flight status to Approved (BOARDING)
+      await transitionFlight(item.checklist.flightId, FlightStatus.BOARDING, session.user.id, { tx });
     }
 
     revalidatePath('/crew/dashboard');

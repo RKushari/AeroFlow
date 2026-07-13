@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { getRiskThreshold } from "@/lib/config";
+import { SSEBanners } from "@/components/alerts/sse-banners";
+import { mockFlights } from "@/lib/mock-data";
 
 export const dynamic = 'force-dynamic';
 
 export default async function DispatcherDashboard() {
   await requireRole(['FLIGHT_DISPATCHER', 'OPERATIONS_DIRECTOR']);
 
-  const flights = await db.flights.findMany({
+  let flights = await db.flights.findMany({
     include: {
       route: true,
       risk: true,
@@ -17,21 +20,45 @@ export default async function DispatcherDashboard() {
     orderBy: { flightNumber: 'asc' },
   });
 
+  if (flights.length === 0) {
+    flights = mockFlights.map((f: any) => ({ ...f, incidents: [] })) as any;
+  }
+
+  const threshold = await getRiskThreshold();
+  const totalDbAlerts = await db.alertLogs.count();
+  let unreadAlertsCount = 0;
+  
+  if (totalDbAlerts === 0) {
+    const { mockAlerts } = await import("@/lib/mock-data");
+    unreadAlertsCount = mockAlerts.filter(a => !a.read).length;
+  } else {
+    unreadAlertsCount = await db.alertLogs.count({ where: { read: false } });
+  }
+
   return (
     <div className="flex flex-col gap-6">
+      <SSEBanners />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Readiness Cockpit</h1>
         <div className="flex gap-2">
-          {/* SSE Alert Drawer Trigger */}
-          <button className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300">
-            Alerts (3)
-          </button>
+          <Link 
+            href="/dispatcher/flights/new" 
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Declare Flight
+          </Link>
+          <Link 
+            href="/dispatcher/alerts" 
+            className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300"
+          >
+            Alerts ({unreadAlertsCount})
+          </Link>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {flights.map((flight) => {
-          const isCritical = flight.risk && flight.risk.totalScore >= 0.75;
+          const isCritical = flight.risk && flight.risk.totalScore >= threshold;
           const hasIncidents = flight.incidents.length > 0;
           const blocked = isCritical || hasIncidents || flight.status === 'HOLD';
 

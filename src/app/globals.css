@@ -1,8 +1,39 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #1e293b; /* slate-800 base for the wave effect */
+  --foreground: #f1f5f9; /* slate-100 */
+  --wave-bg: #334155;    /* slate-700 */
+  --card-bg: rgba(30, 41, 59, 0.7);
+  --card-border: rgba(71, 85, 105, 0.5);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --header-bg: rgba(15, 23, 42, 0.85);
+  --header-border: rgba(51, 65, 85, 0.6);
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --wave-bg: #1e293b;
+  --card-bg: rgba(15, 23, 42, 0.7);
+  --card-border: rgba(51, 65, 85, 0.5);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --header-bg: rgba(2, 6, 23, 0.85);
+  --header-border: rgba(30, 41, 59, 0.6);
+}
+
+.light {
+  --background: #3b5998;
+  --foreground: #ffffff;
+  --wave-bg: #4a6baf;
+  --card-bg: rgba(255, 255, 255, 0.12);
+  --card-border: rgba(255, 255, 255, 0.25);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.75);
+  --header-bg: rgba(59, 89, 152, 0.9);
+  --header-border: rgba(255, 255, 255, 0.15);
 }
 
 @theme inline {
@@ -12,15 +43,120 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  transition: background-color 0.4s ease, color 0.3s ease;
+  overflow-x: hidden;
+}
+
+/* ── Wave Animation Background ── */
+.box {
+  position: fixed;
+  top: 0;
+  left: 0;
+  transform: rotate(80deg);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.wave {
+  position: absolute;
+  width: 1500px;
+  height: 1300px;
+  margin-left: -150px;
+  margin-top: -250px;
+  border-radius: 43%;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.wave.-one {
+  animation: rotate 10000ms infinite linear;
+  opacity: 0.06;
+  background: white;
+}
+
+.wave.-two {
+  animation: rotate 6000ms infinite linear;
+  opacity: 0.12;
+  background: white;
+}
+
+.wave.-three {
+  animation: rotate 8000ms infinite linear reverse;
+  opacity: 0.04;
+  background: white;
+}
+
+/* ── Glassmorphism Cards ── */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--card-border);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px);
+}
+
+.dark .glass-card:hover {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: rgba(71, 85, 105, 0.7);
+}
+
+/* ── Header Glass ── */
+.glass-header {
+  background: var(--header-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--header-border);
+}
+
+/* ── Stat Card ── */
+.stat-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.dark .stat-card {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(51, 65, 85, 0.5);
+}
+
+/* ── Info Card ── */
+.info-card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .info-card {
+  background: rgba(15, 23, 42, 0.4);
+  border-color: rgba(51, 65, 85, 0.4);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
 }

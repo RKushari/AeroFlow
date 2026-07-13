@@ -5,6 +5,7 @@ import { requireRole } from './auth';
 import { calculateRisk } from './risk';
 import { DispatchApprovalSchema, ManualOverrideSchema, IncidentReportSchema, ChecklistItemUpdateSchema, ShiftLogSchema, AiBriefingSchema } from './validations';
 import { Prisma } from '@prisma/client';
+import { eventBus } from './events';
 
 async function logAudit(userId: string, action: string, resourceId: string, oldState: any, newState: any, tx: Prisma.TransactionClient = db) {
   await tx.auditLedger.create({
@@ -109,6 +110,14 @@ export async function reportIncident(data: any) {
       }
     });
     await calculateRisk(parsed.flightId, tx);
+
+    eventBus.emit('alert_broadcast', {
+      type: 'INCIDENT_REPORTED',
+      flightId: parsed.flightId,
+      severity: parsed.severity,
+      timestamp: new Date().toISOString()
+    });
+
     return incident;
   });
 }

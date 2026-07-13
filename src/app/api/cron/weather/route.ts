@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { fetchWeatherSeverity } from '@/lib/services/weather';
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('Authorization');
@@ -15,32 +16,16 @@ export async function GET(req: Request) {
     });
 
     for (const flight of activeFlights) {
-      const apiKey = process.env.OPENWEATHER_API_KEY;
-      if (!apiKey) throw new Error("Missing OPENWEATHER_API_KEY");
-
       try {
-        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=40.71&lon=-74.00&appid=${apiKey}`, {
-          signal: AbortSignal.timeout(5000)
+        const { severityIndex, rawData } = await fetchWeatherSeverity(flight.route.destinationId);
+
+        await db.weatherRecords.create({ 
+          data: { 
+            flightId: flight.id,
+            severityIndex, 
+            rawData: rawData as any
+          } 
         });
-        if (!res.ok) {
-          console.error("OpenWeather API Error:", await res.text());
-          continue;
-        }
-
-        const weatherData = await res.json();
-      const windSpeed = weatherData.wind?.speed ?? 0;
-      
-      let severityIndex = 0.1;
-      if (windSpeed > 20) severityIndex = 0.5;
-      if (windSpeed > 40) severityIndex = 0.9;
-
-      await db.weatherRecords.create({ 
-        data: { 
-          flightId: flight.id,
-          severityIndex, 
-          rawData: weatherData 
-        } 
-      });
       } catch (err) {
         console.error(`Weather fetch failed for flight ${flight.id}:`, err);
       }

@@ -29,12 +29,21 @@ enum Severity {
   CRITICAL
 }
 
+enum MessagePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 // Entities
 model Users {
   id String @id @default(uuid())
   role Role
   email String @unique
   name String
+  password String?
+  phone String?
   shiftLogs ShiftLogs[]
   incidents Incidents[]
   approvals DispatchApprovals[]
@@ -59,7 +68,7 @@ model Flights {
   incidents Incidents[]
   crewUsers Users[]
   risk RiskCalculations?
-  briefing SafetyBriefings?
+  briefings SafetyBriefings[]
 }
 
 model DispatchPlans {
@@ -154,11 +163,12 @@ model DispatchApprovals {
 
 model SafetyBriefings {
   id String @id @default(uuid())
-  flightId String @unique
+  flightId String
   flight Flights @relation(fields: [flightId], references: [id])
   draftContent String
   finalContent String?
   isApproved Boolean @default(false)
+  deletedAt DateTime?
 }
 
 model AuditLedger {
@@ -183,6 +193,8 @@ model BroadcastMessages {
   id String @id @default(uuid())
   authorId String
   content String
+  priority MessagePriority @default(LOW)
+  expiresAt DateTime?
   createdAt DateTime @default(now())
 }
 
@@ -236,4 +248,11 @@ model ManualOverrides {
   userId String
   justification String
   createdAt DateTime @default(now())
+}
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
 }
