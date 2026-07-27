@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { StaggerContainer, StaggerItem } from "@/components/animations/stagger-container";
 
 export function AnalyticsDashboard({ 
   userId, 
@@ -45,11 +46,12 @@ export function AnalyticsDashboard({
     switch(id) {
       case 'incidents':
         return (
-          <div className="bg-white p-4 border rounded-xl shadow-sm h-80">
-            <h2 className="font-bold mb-4">Incident Trends by Month</h2>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={incidentData}>
-                <CartesianGrid strokeDasharray="3 3" />
+          <div className="bg-white dark:bg-slate-900 p-4 border dark:border-slate-800 rounded-xl shadow-sm h-96 flex flex-col">
+            <h2 className="font-bold mb-4 text-slate-900 dark:text-white">Incident Trends by Month</h2>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={incidentData}>
+                  <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip />
@@ -60,29 +62,33 @@ export function AnalyticsDashboard({
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
         );
       case 'risk':
         return (
-          <div className="bg-white p-4 border rounded-xl shadow-sm h-80">
-            <h2 className="font-bold mb-4">Average Departure Risk Score</h2>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={riskData}>
-                <CartesianGrid strokeDasharray="3 3" />
+          <div className="bg-white dark:bg-slate-900 p-4 border dark:border-slate-800 rounded-xl shadow-sm h-96 flex flex-col">
+            <h2 className="font-bold mb-4 text-slate-900 dark:text-white">Average Departure Risk Score</h2>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={riskData}>
+                  <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis domain={[0, 10]} />
                 <Tooltip />
                 <Line type="monotone" dataKey="risk" stroke="#ef4444" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         );
       case 'fatigue':
         return (
-          <div className="bg-white p-4 border rounded-xl shadow-sm h-80">
-            <h2 className="font-bold mb-4">Fleet-Wide Fatigue Index</h2>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={fatigueData}>
-                <CartesianGrid strokeDasharray="3 3" />
+          <div className="bg-white dark:bg-slate-900 p-4 border dark:border-slate-800 rounded-xl shadow-sm h-96 flex flex-col">
+            <h2 className="font-bold mb-4 text-slate-900 dark:text-white">Fleet-Wide Fatigue Index</h2>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={fatigueData}>
+                  <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis domain={[0, 1]} />
                 <Tooltip />
@@ -90,14 +96,16 @@ export function AnalyticsDashboard({
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
         );
       case 'checklists':
         return (
-          <div className="bg-white p-4 border rounded-xl shadow-sm h-80">
-            <h2 className="font-bold mb-4">Checklist Completion Rates (%)</h2>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={checklistData}>
-                <CartesianGrid strokeDasharray="3 3" />
+          <div className="bg-white dark:bg-slate-900 p-4 border dark:border-slate-800 rounded-xl shadow-sm h-96 flex flex-col">
+            <h2 className="font-bold mb-4 text-slate-900 dark:text-white">Checklist Completion Rates (%)</h2>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={checklistData}>
+                  <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis domain={[0, 100]} />
                 <Tooltip />
@@ -105,22 +113,23 @@ export function AnalyticsDashboard({
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
         );
       default: return null;
     }
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {layout.map((id: string, idx: number) => (
-        <div key={id} className="relative group">
+        <StaggerItem key={id} className="relative group">
           {renderWidget(id)}
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button onClick={() => moveItem(idx, -1)} disabled={idx === 0} className="p-1 bg-slate-100 rounded text-xs disabled:opacity-50">←</button>
             <button onClick={() => moveItem(idx, 1)} disabled={idx === layout.length - 1} className="p-1 bg-slate-100 rounded text-xs disabled:opacity-50">→</button>
           </div>
-        </div>
+        </StaggerItem>
       ))}
-    </div>
+    </StaggerContainer>
   );
 }

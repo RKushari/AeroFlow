@@ -65,7 +65,7 @@ export function RouteTrendsClient({ chartData, availableRoutes, savedFilters }: 
               </button>
             </div>
             {savedFilters.length > 0 && (
-              <select onChange={(e) => loadFilter(JSON.parse(e.target.value))} className="w-full p-2 border text-sm rounded mt-2">
+              <select onChange={(e) => loadFilter(JSON.parse(e.target.value))} className="w-full p-2 border text-sm rounded mt-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
                 <option value="">Load a filter...</option>
                 {savedFilters.map((f, i) => (
                   <option key={i} value={JSON.stringify(f.query)}>{f.name}</option>

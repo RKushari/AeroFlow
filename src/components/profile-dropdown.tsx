@@ -5,16 +5,16 @@ import { Shield, ShieldAlert, ShieldCheck, User, ChevronDown, LogOut, Settings, 
 import { signOut } from 'next-auth/react';
 import { getProfileSettings, updateProfileSettings } from '@/lib/actions/profile';
 
-export default function ProfileDropdown() {
+export default function ProfileDropdown({ session }: { session: any }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
   const [profile, setProfile] = useState({
-    name: 'Loading...',
-    email: 'loading@aeroflow.com',
-    role: 'Loading...',
+    name: session?.user?.name || 'Loading...',
+    email: session?.user?.email || 'loading@aeroflow.com',
+    role: session?.user?.role || 'Loading...',
     pictureUrl: null as string | null,
     status: 'ON_DUTY' as 'ON_DUTY' | 'OFF_DUTY',
   });
@@ -27,13 +27,14 @@ export default function ProfileDropdown() {
   useEffect(() => {
     getProfileSettings().then(data => {
       if (data) {
-        setProfile({
-          name: data.name || '',
-          email: data.email || '',
+        setProfile(prev => ({
+          ...prev,
+          name: data.name || prev.name,
+          email: data.email || prev.email,
           role: data.email === 'johndoe@gmail.com' ? 'SUPER_ADMIN' : data.role,
           pictureUrl: data.pictureUrl,
           status: data.status,
-        });
+        }));
         setEditPicture(data.pictureUrl);
         setEditStatus(data.status);
       }

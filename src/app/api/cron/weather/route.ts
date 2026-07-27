@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { fetchWeatherSeverity } from '@/lib/services/weather';
+import { calculateRisk } from '@/lib/risk';
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('Authorization');
@@ -26,6 +27,13 @@ export async function GET(req: Request) {
             rawData: rawData as any
           } 
         });
+
+        // Recalculate risk with updated weather data
+        try {
+          await calculateRisk(flight.id);
+        } catch (riskErr) {
+          console.error(`Risk recalculation failed for flight ${flight.id}:`, riskErr);
+        }
       } catch (err) {
         console.error(`Weather fetch failed for flight ${flight.id}:`, err);
       }

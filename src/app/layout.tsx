@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import ProfileDropdown from "@/components/profile-dropdown";
 import Link from "next/link";
+import { getSession } from "@/lib/auth";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -13,11 +14,13 @@ export const metadata: Metadata = {
   description: "Production-grade aviation safety and risk intelligence platform.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getSession();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} min-h-screen antialiased`}>
@@ -40,7 +43,7 @@ export default function RootLayout({
                 AeroFlow
               </Link>
               <div className="flex items-center gap-4">
-                <ProfileDropdown />
+                <ProfileDropdown session={session} />
                 <ThemeToggle />
               </div>
             </header>

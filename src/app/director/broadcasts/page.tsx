@@ -52,7 +52,7 @@ export default async function BroadcastsPage() {
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Priority</label>
-              <select name="priority" className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-transparent text-slate-900 dark:text-white">
+              <select name="priority" className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                 <option value="LOW">Low</option>
                 <option value="MEDIUM">Medium</option>
                 <option value="HIGH">High</option>

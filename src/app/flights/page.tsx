@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
-import { Activity, Plane } from "lucide-react";
+import { ArrowLeft, Shield, Radio } from "lucide-react";
 import { requireRole } from "@/lib/auth";
-import { mockFlights } from "@/lib/mock-data";
+import { LiveFlights } from "@/components/live-flights";
+import { InternalFlightsCard } from "./internal-flights-card";
 
 export const dynamic = 'force-dynamic';
 
@@ -18,57 +19,49 @@ export default async function FlightBoardPage() {
     }
   });
 
-  if (flights.length === 0) {
-    flights = mockFlights as any;
-  }
-
   return (
-    <div className="flex flex-col gap-8 p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <Plane className="text-blue-500" /> Active Flight Board
-        </h1>
-        <Link href="/" className="px-4 py-2 bg-slate-200 text-slate-900 hover:bg-slate-300 rounded-lg text-sm font-medium transition-colors">
-          Return to Command Center
-        </Link>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        {flights.length === 0 ? (
-          <div className="p-8 text-center text-slate-500">
-            No active flights.
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black">
+      <div className="max-w-7xl mx-auto flex flex-col gap-8">
+        
+        {/* Command Deck Header */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-2xl">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-900/40">
+              <Radio className="h-7 w-7 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white font-mono">
+                  AEROFLOW TELEMETRY RADAR
+                </h1>
+                <span className="px-2.5 py-1 text-[10px] font-bold font-mono rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  TACTICAL DECK
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1 font-mono flex items-center gap-2">
+                <Shield className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Geospatial Radar Engine & Airspace Operations Deck</span>
+              </p>
+            </div>
           </div>
-        ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm">
-                <th className="p-4 font-semibold">Flight ID</th>
-                <th className="p-4 font-semibold">Origin</th>
-                <th className="p-4 font-semibold">Destination</th>
-                <th className="p-4 font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {flights.map(flight => (
-                <tr key={flight.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4 font-bold text-slate-800">{flight.flightNumber}</td>
-                  <td className="p-4 text-slate-600">{flight.route.originId}</td>
-                  <td className="p-4 text-slate-600">{flight.route.destinationId}</td>
-                  <td className="p-4">
-                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wide ${
-                      flight.status === 'HOLD' || flight.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
-                      flight.status === 'SCHEDULED' ? 'bg-slate-100 text-slate-700' :
-                      flight.status === 'BOARDING' ? 'bg-amber-100 text-amber-700' :
-                      'bg-green-100 text-green-700'
-                    }`}>
-                      {flight.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+
+          <Link 
+            href="/" 
+            className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/80 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 shadow-lg"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Return to Command Center
+          </Link>
+        </div>
+
+        {/* Live Flights Component */}
+        <div className="w-full">
+          <LiveFlights />
+        </div>
+
+        {/* AeroFlow Internal Monitored Flights (Collapsible Card) */}
+        <InternalFlightsCard flights={flights} />
+
       </div>
     </div>
   );

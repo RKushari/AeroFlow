@@ -225,9 +225,9 @@ export default function AdminClient({
                           className="bg-slate-900 border border-white/10 text-white rounded px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                           disabled={isPending}
                         >
-                          <option value={Role.GROUND_CREW_LEAD}>Ground Crew Lead</option>
-                          <option value={Role.FLIGHT_DISPATCHER}>Flight Dispatcher</option>
-                          <option value={Role.OPERATIONS_DIRECTOR}>Operations Director</option>
+                          <option className="bg-slate-900 text-white" value={Role.GROUND_CREW_LEAD}>Ground Crew Lead</option>
+                          <option className="bg-slate-900 text-white" value={Role.FLIGHT_DISPATCHER}>Flight Dispatcher</option>
+                          <option className="bg-slate-900 text-white" value={Role.OPERATIONS_DIRECTOR}>Operations Director</option>
                         </select>
                       </td>
                     </tr>

@@ -2,13 +2,15 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { completeChecklistItem, submitShiftLog } from "@/lib/actions/crew";
 import { seedDummyEquipment, logEquipmentMaintenance } from "@/lib/actions/equipment";
+import { FlightSimulator3D } from "@/components/flight-simulator-3d";
+import { Shield, Wrench, Plane, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
 
 export default async function CrewDashboard() {
   const session = await requireRole(['GROUND_CREW_LEAD', 'OPERATIONS_DIRECTOR']);
 
-  const flights = await db.flights.findMany({
+  let flights = await db.flights.findMany({
     where: {
       status: 'SCHEDULED'
     },
@@ -30,13 +32,53 @@ export default async function CrewDashboard() {
   }
 
   return (
-    <div className="flex flex-col gap-8 p-4">
-      <div>
-        <h1 className="text-2xl font-bold mb-6">Ground Operations</h1>
-        
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black flex flex-col gap-8">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-2xl">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-xl shadow-lg shadow-amber-900/30">
+            <Wrench className="h-7 w-7" />
+          </div>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white font-mono">
+                GROUND OPERATIONS DECK
+              </h1>
+              <span className="px-2.5 py-1 text-[10px] font-bold font-mono rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                CREW CONTROL
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1 font-mono flex items-center gap-2">
+              <Shield className="h-3.5 w-3.5 text-emerald-400" />
+              <span>Pre-Flight Readiness, Checklist Verification & Equipment Telemetry</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 3D Boeing 737 Flight Simulator Deck */}
+      <div className="w-full space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold font-mono flex items-center gap-2 text-slate-200">
+            <Plane className="h-5 w-5 text-blue-400" /> 3D Aircraft Flight Deck Simulator
+          </h2>
+          <span className="text-xs text-slate-400 font-mono bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
+            Interactive Flight Dynamics & Gear Physics
+          </span>
+        </div>
+        <FlightSimulator3D />
+      </div>
+
+      {/* Scheduled Flights & Pre-Flight Checklists */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold font-mono flex items-center gap-2 text-slate-200">
+          <Clock className="h-5 w-5 text-emerald-400" /> Scheduled Flight Pre-Flight Checklists
+        </h2>
+
         {flights.length === 0 && (
-          <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-xl text-slate-500 mb-8">
-            No flights are currently scheduled for dispatch.
+          <div className="p-8 text-center bg-slate-900/60 border border-slate-800 rounded-2xl text-slate-400 font-mono text-sm">
+            No flights are currently scheduled for ground crew dispatch.
           </div>
         )}
 
@@ -45,53 +87,65 @@ export default async function CrewDashboard() {
             const isAssigned = flight.crewUsers.some(u => u.id === session.user.id);
 
             return (
-              <div key={flight.id} className="p-5 border rounded-xl shadow-sm bg-white">
-                <h2 className="font-bold text-lg mb-2">Flight {flight.flightNumber}</h2>
-                
-                <div className="mb-4">
-                  <h3 className="font-semibold text-sm mb-2 text-slate-600">Pre-Flight Checklists</h3>
-                  {flight.checklists.map(checklist => (
-                    <div key={checklist.id} className="ml-2 mb-4">
-                      {checklist.items.map(item => (
-                        <div key={item.id} className="flex items-center gap-3 py-1 text-sm">
-                          <form action={async () => {
-                            'use server';
-                            await completeChecklistItem(item.id);
-                          }}>
-                            <button 
-                              type="submit" 
-                              disabled={item.isComplete}
-                              className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${item.isComplete ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300'}`}
-                            >
-                              {item.isComplete && "✓"}
-                            </button>
-                          </form>
-                          <span className={item.isComplete ? "text-slate-400 line-through" : ""}>
-                            {item.task} {item.isMandatory && <span className="text-red-500 text-xs">*</span>}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
+              <div key={flight.id} className="p-6 border border-slate-800/80 rounded-2xl shadow-xl bg-slate-900/60 backdrop-blur-xl flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-800">
+                    <h3 className="font-bold text-lg font-mono text-white flex items-center gap-2">
+                      <Plane className="h-4 w-4 text-blue-400" /> Flight {flight.flightNumber}
+                    </h3>
+                    <span className="px-2.5 py-1 text-[10px] font-bold font-mono rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      {flight.status}
+                    </span>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-xs font-mono mb-2 text-slate-400 uppercase tracking-wider">Mandatory Pre-Flight Checklists</h4>
+                    {flight.checklists.map(checklist => (
+                      <div key={checklist.id} className="ml-1 mb-4 space-y-2">
+                        {checklist.items.map(item => (
+                          <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-950/70 border border-slate-800 text-xs font-mono">
+                            <form action={async () => {
+                              'use server';
+                              await completeChecklistItem(item.id);
+                            }}>
+                              <button 
+                                type="submit" 
+                                disabled={item.isComplete}
+                                className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${item.isComplete ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}
+                              >
+                                {item.isComplete && "✓"}
+                              </button>
+                            </form>
+                            <span className={item.isComplete ? "text-slate-500 line-through" : "text-slate-200"}>
+                              {item.task} {item.isMandatory && <span className="text-red-400 text-xs">*</span>}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {!isAssigned && (
-                  <div className="mt-4 pt-4 border-t">
+                  <div className="pt-4 border-t border-slate-800">
                     <form action={async (formData: FormData) => {
                       'use server';
                       const fatigue = parseInt(formData.get('fatigue') as string || '0', 10);
                       await submitShiftLog(flight.id, fatigue);
-                    }} className="flex items-center gap-3">
-                      <label className="text-sm font-medium">Log Fatigue (0-10):</label>
-                      <input type="number" name="fatigue" min="0" max="10" defaultValue="5" className="w-16 border rounded px-2 py-1 text-sm" />
-                      <button type="submit" className="px-4 py-2 bg-slate-900 text-white rounded text-sm font-medium">Clock In</button>
+                    }} className="flex items-center gap-3 font-mono">
+                      <label className="text-xs text-slate-400">Fatigue Index (0-10):</label>
+                      <input type="number" name="fatigue" min="0" max="10" defaultValue="3" className="w-14 border border-slate-700 bg-slate-950 rounded-lg px-2 py-1 text-xs text-white" />
+                      <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold font-mono transition-colors shadow-lg shadow-blue-900/30">
+                        Clock In
+                      </button>
                     </form>
                   </div>
                 )}
                 
                 {isAssigned && (
-                  <div className="mt-4 pt-4 border-t text-sm text-green-600 font-medium">
-                    ✓ Checked in for this flight
+                  <div className="pt-3 border-t border-slate-800 text-xs text-emerald-400 font-mono font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    <span>Clocked in for ground dispatch duty</span>
                   </div>
                 )}
               </div>
@@ -100,18 +154,24 @@ export default async function CrewDashboard() {
         </div>
       </div>
 
-      <div>
-        <h2 className="text-xl font-bold mb-4">Equipment Status Board</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Ground Equipment Status Board */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold font-mono flex items-center gap-2 text-slate-200">
+          <Wrench className="h-5 w-5 text-amber-400" /> Ground Support Equipment (GSE) Status Board
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono">
           {equipment.map(eq => (
-            <div key={eq.id} className="p-4 bg-white border rounded-xl flex flex-col gap-3">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-slate-800">{eq.identifier}</span>
-                <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                  eq.status === 'CRITICAL' ? 'bg-red-100 text-red-700' :
-                  eq.status === 'HIGH' ? 'bg-orange-100 text-orange-700' :
-                  eq.status === 'MEDIUM' ? 'bg-amber-100 text-amber-700' :
-                  'bg-green-100 text-green-700'
+            <div key={eq.id} className="p-5 bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl flex flex-col gap-3 shadow-xl">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                <span className="font-bold text-white text-sm flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-400" /> {eq.identifier}
+                </span>
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border ${
+                  eq.status === 'CRITICAL' ? 'bg-red-950/60 text-red-300 border-red-800/50' :
+                  eq.status === 'HIGH' ? 'bg-orange-950/60 text-orange-300 border-orange-800/50' :
+                  eq.status === 'MEDIUM' ? 'bg-amber-950/60 text-amber-300 border-amber-800/50' :
+                  'bg-emerald-950/60 text-emerald-300 border-emerald-800/50'
                 }`}>
                   {eq.status === 'LOW' ? 'OPERATIONAL' : eq.status}
                 </span>
@@ -124,19 +184,22 @@ export default async function CrewDashboard() {
                   await logEquipmentMaintenance(eq.id, notes, status);
                 }
               }} className="flex gap-2">
-                <select name="status" defaultValue={eq.status} className="border rounded px-2 py-1 text-sm bg-slate-50">
+                <select name="status" defaultValue={eq.status} className="border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs bg-slate-950 text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
                   <option value="LOW">Operational</option>
-                  <option value="MEDIUM">Maintenance Needed</option>
+                  <option value="MEDIUM font-mono">Maintenance Needed</option>
                   <option value="HIGH">Degraded</option>
                   <option value="CRITICAL">Out of Service</option>
                 </select>
-                <input type="text" name="notes" placeholder="Log maintenance note..." required className="flex-1 border rounded px-2 py-1 text-sm" />
-                <button type="submit" className="px-3 py-1 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-500">Log</button>
+                <input type="text" name="notes" placeholder="Log maintenance notes..." required className="flex-1 border border-slate-700 bg-slate-950 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <button type="submit" className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-blue-900/30">
+                  Log
+                </button>
               </form>
             </div>
           ))}
         </div>
       </div>
+
     </div>
   );
 }

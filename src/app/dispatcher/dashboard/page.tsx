@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { getRiskThreshold } from "@/lib/config";
 import { SSEBanners } from "@/components/alerts/sse-banners";
-import { mockFlights } from "@/lib/mock-data";
+import { StaggerContainer, StaggerItem } from "@/components/animations/stagger-container";
+import { FadeIn } from "@/components/animations/fade-in";
 
 export const dynamic = 'force-dynamic';
 
@@ -19,10 +20,6 @@ export default async function DispatcherDashboard() {
     },
     orderBy: { flightNumber: 'asc' },
   });
-
-  if (flights.length === 0) {
-    flights = mockFlights.map((f: any) => ({ ...f, incidents: [] })) as any;
-  }
 
   const threshold = await getRiskThreshold();
   const totalDbAlerts = await db.alertLogs.count();
@@ -56,16 +53,16 @@ export default async function DispatcherDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {flights.map((flight) => {
           const isCritical = flight.risk && flight.risk.totalScore >= threshold;
           const hasIncidents = flight.incidents.length > 0;
           const blocked = isCritical || hasIncidents || flight.status === 'HOLD';
 
           return (
-            <Link
-              key={flight.id}
-              href={`/dispatcher/flight/${flight.id}`}
+            <StaggerItem key={flight.id}>
+              <Link
+                href={`/dispatcher/flight/${flight.id}`}
               className={`p-5 border rounded-xl shadow-sm flex flex-col gap-3 transition-shadow hover:shadow-md ${
                 blocked ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'
               }`}
@@ -88,7 +85,8 @@ export default async function DispatcherDashboard() {
                   {hasIncidents && <div>• Unresolved Incidents ({flight.incidents.length})</div>}
                 </div>
               )}
-            </Link>
+              </Link>
+            </StaggerItem>
           );
         })}
 
@@ -97,7 +95,7 @@ export default async function DispatcherDashboard() {
             No active flights requiring dispatch.
           </div>
         )}
-      </div>
+      </StaggerContainer>
     </div>
   );
 }

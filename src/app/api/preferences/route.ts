@@ -12,10 +12,10 @@ export async function POST(req: NextRequest) {
     where: { userId: session.user.id },
     create: {
       userId: session.user.id,
-      layoutConfig: JSON.stringify(layout)
+      layoutConfig: { layout }
     },
     update: {
-      layoutConfig: JSON.stringify(layout)
+      layoutConfig: { layout }
     }
   });
 

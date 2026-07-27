@@ -51,6 +51,18 @@ body {
   overflow-x: hidden;
 }
 
+button {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+button:not(:disabled):hover {
+  transform: scale(1.02);
+}
+
+button:not(:disabled):active {
+  transform: scale(0.95);
+}
+
 /* ── Wave Animation Background ── */
 .box {
   position: fixed;

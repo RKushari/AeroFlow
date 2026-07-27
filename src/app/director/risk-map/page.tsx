@@ -5,22 +5,37 @@ import { RiskMapClient } from "./client-map";
 export default async function RiskMapPage() {
   await requireRole(['OPERATIONS_DIRECTOR']);
 
-  // We fetch current flights with weather and calculate a score per airport (origin/destination)
-  // For the prototype, we'll just mock airport coordinates and their current max risk.
-  const airports = [
-    { code: 'JFK', name: 'John F. Kennedy Intl', cx: 80, cy: 30, risk: Math.random() * 10 },
-    { code: 'LAX', name: 'Los Angeles Intl', cx: 20, cy: 60, risk: Math.random() * 10 },
-    { code: 'ORD', name: 'Chicago O\'Hare Intl', cx: 60, cy: 35, risk: Math.random() * 10 },
-    { code: 'MIA', name: 'Miami Intl', cx: 75, cy: 80, risk: Math.random() * 10 },
-    { code: 'SEA', name: 'Seattle-Tacoma Intl', cx: 15, cy: 20, risk: Math.random() * 10 },
-  ];
+  const { fetchWeatherSeverity } = await import("@/lib/services/weather");
+  const { globalAirports } = await import("@/lib/data/airports");
+
+  const config = await db.systemConfig.findUnique({ where: { key: 'monitored_airports' } });
+  const monitoredCodes: string[] = config ? JSON.parse(config.value) : ['JFK', 'LAX', 'ORD', 'MIA', 'SEA'];
+
+  const baseAirports = monitoredCodes.map(code => {
+    const ap = globalAirports.find(a => a.code === code);
+    return ap || { code, name: code, lat: 0, lng: 0, city: '', country: '' };
+  });
+
+  const airports = await Promise.all(
+    baseAirports.map(async (ap) => {
+      try {
+        const weather = await fetchWeatherSeverity(ap.code);
+        return { 
+          ...ap, 
+          risk: weather.severityIndex * 10,
+          hourlyForecast: weather.rawData?.hourly 
+        };
+      } catch (e) {
+        console.warn(`Weather fetch failed for ${ap.code}`, e);
+        return { ...ap, risk: 0 };
+      }
+    })
+  );
 
   // Fetch flagged zones
   let flagged = await db.flaggedZones.findMany();
   
-  if (flagged.length === 0) {
-    flagged = (await import("@/lib/mock-data")).mockRiskMap as any;
-  }
+
 
   return (
     <div className="p-6 max-w-6xl mx-auto">

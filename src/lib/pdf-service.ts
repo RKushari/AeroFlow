@@ -6,8 +6,12 @@ export async function generateFlightDossier(flightId: string) {
   const flight = await db.flights.findUnique({
     where: { id: flightId },
     include: {
+      route: true,
       risk: true,
       weather: { orderBy: { id: 'desc' }, take: 1 },
+      briefings: { where: { deletedAt: null, isApproved: true }, orderBy: { id: 'desc' }, take: 1 },
+      checklists: { include: { items: true } },
+      crewUsers: true,
       dispatchPlan: {
         include: { approval: true }
       }
@@ -18,22 +22,97 @@ export async function generateFlightDossier(flightId: string) {
 
   const doc = await PDFDocument.create();
   const page = doc.addPage([600, 800]);
+  let y = 750;
+  const lineHeight = 18;
+  const sectionGap = 10;
 
-  page.drawText(`AeroFlow Safety Dossier`, { x: 50, y: 750, size: 24, color: rgb(0, 0, 0) });
-  page.drawText(`Flight Number: ${flight.flightNumber}`, { x: 50, y: 700, size: 14 });
-  page.drawText(`Status: ${flight.status}`, { x: 50, y: 680, size: 14 });
+  const drawLine = (text: string, size = 12, color = rgb(0, 0, 0)) => {
+    if (y < 50) {
+      // Add a new page if we run out of space
+      const newPage = doc.addPage([600, 800]);
+      y = 750;
+      newPage.drawText(text, { x: 50, y, size, color });
+      y -= lineHeight;
+      return newPage;
+    }
+    page.drawText(text, { x: 50, y, size, color });
+    y -= lineHeight;
+    return page;
+  };
 
+  // Title
+  drawLine('AeroFlow Safety Dossier', 22);
+  y -= sectionGap;
+
+  // Flight Info
+  drawLine(`Flight Number: ${flight.flightNumber}`, 14);
+  drawLine(`Route: ${flight.route.originId} → ${flight.route.destinationId}`, 14);
+  drawLine(`Status: ${flight.status}`, 14);
+  y -= sectionGap;
+
+  // Risk
   if (flight.risk) {
-    page.drawText(`Risk Score: ${flight.risk.totalScore.toFixed(2)}`, { x: 50, y: 640, size: 14 });
+    drawLine('--- Risk Assessment ---', 13, rgb(0.8, 0, 0));
+    drawLine(`Total Score: ${flight.risk.totalScore.toFixed(2)}`);
+    drawLine(`Fatigue Factor: ${flight.risk.fatigueFactor.toFixed(2)}`);
+    drawLine(`Weather Factor: ${flight.risk.weatherFactor.toFixed(2)}`);
+    drawLine(`Mechanical Factor: ${flight.risk.mechFactor.toFixed(2)}`);
+    y -= sectionGap;
   }
 
+  // Weather
   if (flight.weather.length > 0) {
-    page.drawText(`Weather Severity: ${flight.weather[0].severityIndex}`, { x: 50, y: 620, size: 14 });
+    drawLine('--- Weather ---', 13, rgb(0, 0, 0.8));
+    drawLine(`Severity Index: ${flight.weather[0].severityIndex.toFixed(2)}`);
+    y -= sectionGap;
   }
 
+  // Crew
+  if (flight.crewUsers.length > 0) {
+    drawLine('--- Assigned Crew ---', 13, rgb(0, 0.5, 0));
+    flight.crewUsers.forEach(u => {
+      drawLine(`• ${u.name} (${u.role})`);
+    });
+    y -= sectionGap;
+  }
+
+  // Checklists
+  if (flight.checklists.length > 0) {
+    drawLine('--- Pre-Flight Checklists ---', 13, rgb(0.5, 0, 0.5));
+    flight.checklists.forEach(cl => {
+      cl.items.forEach(item => {
+        const status = item.isComplete ? '✓' : '✗';
+        const mandatory = item.isMandatory ? ' [MANDATORY]' : '';
+        drawLine(`  ${status} ${item.task}${mandatory}`);
+      });
+    });
+    y -= sectionGap;
+  }
+
+  // Safety Briefing
+  if (flight.briefings.length > 0) {
+    drawLine('--- Approved Safety Briefing ---', 13, rgb(0, 0, 0.6));
+    const briefingText = flight.briefings[0].finalContent || flight.briefings[0].draftContent;
+    // Split long text into lines (max ~70 chars per line)
+    const words = briefingText.split(' ');
+    let currentLine = '';
+    words.forEach((word: string) => {
+      if ((currentLine + ' ' + word).length > 70) {
+        drawLine(`  ${currentLine.trim()}`);
+        currentLine = word;
+      } else {
+        currentLine += ' ' + word;
+      }
+    });
+    if (currentLine.trim()) drawLine(`  ${currentLine.trim()}`);
+    y -= sectionGap;
+  }
+
+  // Dispatch Sign-off
   if (flight.status === FlightStatus.DEPARTED && flight.dispatchPlan?.approval) {
-    page.drawText(`Departure Sign-off Token:`, { x: 50, y: 580, size: 14, color: rgb(0, 0.5, 0) });
-    page.drawText(`${flight.dispatchPlan.approval.id}`, { x: 50, y: 560, size: 12 });
+    drawLine('--- Departure Sign-off ---', 13, rgb(0, 0.5, 0));
+    drawLine(`Token: ${flight.dispatchPlan.approval.id}`);
+    drawLine(`Approved At: ${flight.dispatchPlan.approval.approvedAt.toISOString()}`);
   }
 
   const pdfBytes = await doc.save();

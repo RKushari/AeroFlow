@@ -89,8 +89,8 @@ export default function RegisterPage() {
             disabled={isPending}
             className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50 [&>option]:bg-slate-900"
           >
-            <option value="FLIGHT_DISPATCHER">Flight Dispatcher</option>
-            <option value="GROUND_CREW_LEAD">Ground Crew Lead</option>
+            <option className="bg-slate-900 text-white" value="FLIGHT_DISPATCHER">Flight Dispatcher</option>
+            <option className="bg-slate-900 text-white" value="GROUND_CREW_LEAD">Ground Crew Lead</option>
             {/* OPERATIONS_DIRECTOR omitted per requirements */}
           </select>
         </div>

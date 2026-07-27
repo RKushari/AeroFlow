@@ -14,8 +14,8 @@ export async function generateAiBriefing(flightId: string) {
 
   if (!flight) throw new Error('Flight not found');
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("Missing OPENAI_API_KEY environment variable");
+  const apiKey = process.env.OPENAI_CLIENT_SECRET;
+  if (!apiKey) throw new Error("Missing OPENAI_CLIENT_SECRET environment variable");
 
   const promptContext = `
     Flight: ${flight.flightNumber}

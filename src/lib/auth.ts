@@ -24,6 +24,9 @@ export const authOptions: AuthOptions = {
       }
     })
   ],
+  pages: {
+    signIn: '/login',
+  },
   callbacks: {
     async session({ session, token }) {
       if (session.user && token.sub) {
@@ -87,11 +90,11 @@ export function getDashboardForRole(role: Role): string {
 export async function requireRole(allowedRoles: Role[]) {
   const session = await getSession();
   if (!session) {
-    redirect('/api/auth/signin');
+    redirect('/login');
   }
   
   if (session.user.email !== "johndoe@gmail.com" && !allowedRoles.includes(session.user.role)) {
-    redirect('/api/auth/signin');
+    redirect('/login');
   }
   return session;
 }

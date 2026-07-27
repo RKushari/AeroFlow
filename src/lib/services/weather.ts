@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { globalAirports } from "../data/airports";
 
 /**
  * Fetches real-time weather details from OpenWeatherMap for a given airport code.
@@ -10,39 +11,74 @@ export async function fetchWeatherSeverity(airportCode: string): Promise<{
   severityIndex: number; 
   rawData: any; 
 }> {
-  const apiKey = process.env.OPENWEATHER_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing OPENWEATHER_API_KEY environment variable.");
-  }
-
+  // OpenMeteo does not require an API key for basic usage
   // Look up airport profile if it exists
   const airport = await db.airportProfiles.findUnique({
     where: { code: airportCode },
   });
 
   const queryLoc = airport?.weatherStationId || airportCode;
-  let url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(queryLoc)}&appid=${apiKey}`;
+  
+  let lat = 52.52; // Default fallback (Berlin as per .ENV)
+  let lon = 13.41;
 
-  if (queryLoc.includes(",")) {
-    const [lat, lon] = queryLoc.split(",");
-    url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat.trim()}&lon=${lon.trim()}&appid=${apiKey}`;
+  // Use globalAirports to bypass Geocoding API rate limits/timeouts
+  const ap = globalAirports.find(a => a.code === queryLoc);
+
+  if (ap) {
+    lat = ap.lat;
+    lon = ap.lng;
+  } else if (queryLoc.includes(",")) {
+    const [latStr, lonStr] = queryLoc.split(",");
+    lat = parseFloat(latStr.trim());
+    lon = parseFloat(lonStr.trim());
+  } else {
+    try {
+      const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(queryLoc)}&count=1`, { signal: AbortSignal.timeout(3000) });
+      if (geoRes.ok) {
+         const geoData = await geoRes.json();
+         if (geoData.results && geoData.results.length > 0) {
+            lat = geoData.results[0].latitude;
+            lon = geoData.results[0].longitude;
+         }
+      }
+    } catch (e) {
+      console.warn("Geocoding failed, using default coordinates", e);
+    }
   }
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+  // Use OpenMeteo to get current temperature, wind speed and hourly forecast
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m&hourly=temperature_2m,wind_speed_10m&wind_speed_unit=ms`;
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) {
     const errorText = await res.text();
-    throw new Error(`OpenWeather API error: ${res.status} ${res.statusText} - ${errorText}`);
+    throw new Error(`OpenMeteo API error: ${res.status} ${res.statusText} - ${errorText}`);
   }
 
   const weatherData = await res.json();
-  const windSpeed = weatherData.wind?.speed ?? 0;
-  const description = weatherData.weather?.[0]?.description ?? "Clear";
+  const windSpeed = weatherData.current?.wind_speed_10m ?? 0;
+  const temperature = weatherData.current?.temperature_2m ?? 0;
+  const description = `Temp: ${temperature}°C`;
 
-  // Compute severity index based on wind speed
-  let severityIndex = 0.1;
-  if (windSpeed > 10) severityIndex = 0.4; // > 10 m/s (~19 knots)
-  if (windSpeed > 20) severityIndex = 0.8; // > 20 m/s (~39 knots)
-  if (windSpeed > 30) severityIndex = 1.0; // > 30 m/s (~58 knots)
+  // Continuous wind factor
+  let windFactor = 0.1;
+  if (windSpeed >= 5 && windSpeed <= 30) {
+    windFactor = 0.1 + ((windSpeed - 5) / 25) * 0.9;
+  } else if (windSpeed > 30) {
+    windFactor = 1.0;
+  }
+
+  // Continuous temperature factor
+  let tempFactor = 0.0;
+  if (temperature < -10) tempFactor = 1.0;
+  else if (temperature < 0) tempFactor = (0 - temperature) / 10;
+  else if (temperature > 40) tempFactor = 1.0;
+  else if (temperature > 30) tempFactor = (temperature - 30) / 10;
+
+  // Combined severity
+  let severityIndex = Math.min(1.0, (windFactor * 0.7) + (tempFactor * 0.3));
+  severityIndex = Math.max(0.1, severityIndex);
 
   return {
     rawConditions: `Wind ${windSpeed} m/s, ${description}`,
