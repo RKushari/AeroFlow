@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PlaneTakeoff, Wrench, ShieldAlert, Activity, Users, CloudLightning, ArrowRight, Radio, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,6 +32,42 @@ export function CommandCenterClient({ stats }: { stats: { flightsCount: number, 
   const [showRiskModal, setShowRiskModal] = useState(false);
   const [riskData, setRiskData] = useState<any>(null);
   const [loadingRisk, setLoadingRisk] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    
+    const resetTimer = () => {
+      setIsShaking(false);
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 1000);
+      }, 5000);
+    };
+
+    resetTimer();
+
+    window.addEventListener('mousemove', resetTimer);
+    window.addEventListener('keydown', resetTimer);
+    window.addEventListener('click', resetTimer);
+    window.addEventListener('scroll', resetTimer);
+    window.addEventListener('touchstart', resetTimer);
+
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keydown', resetTimer);
+      window.removeEventListener('click', resetTimer);
+      window.removeEventListener('scroll', resetTimer);
+      window.removeEventListener('touchstart', resetTimer);
+    };
+  }, []);
+
+  const shakeAnimation = {
+    x: [0, -8, 8, -8, 8, -4, 4, 0],
+    transition: { duration: 0.5 }
+  };
 
   const handleRiskClick = async () => {
     setLoadingRisk(true);
@@ -110,10 +146,11 @@ export function CommandCenterClient({ stats }: { stats: { flightsCount: number, 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
         {/* Flight Dispatch */}
         <motion.div variants={itemVariants} whileHover={cardHover}>
-          <Link
-            href="/dispatcher/dashboard"
-            className="glass-card group block h-full rounded-2xl overflow-hidden"
-          >
+          <motion.div animate={isShaking ? shakeAnimation : {}} className="h-full">
+            <Link
+              href="/dispatcher/dashboard"
+              className="glass-card group block h-full rounded-2xl overflow-hidden"
+            >
             <div className="p-8 h-full flex flex-col">
               <div className="p-3.5 rounded-xl bg-blue-500/15 text-blue-400 w-fit mb-6 ring-1 ring-blue-500/25 group-hover:bg-blue-500/25 group-hover:ring-blue-400/40 transition-all">
                 <PlaneTakeoff size={26} />
@@ -128,15 +165,17 @@ export function CommandCenterClient({ stats }: { stats: { flightsCount: number, 
                 Launch Workspace <ArrowRight className="ml-2 h-4 w-4" />
               </div>
             </div>
-          </Link>
+            </Link>
+          </motion.div>
         </motion.div>
 
         {/* Ground Crew */}
         <motion.div variants={itemVariants} whileHover={cardHover}>
-          <Link
-            href="/crew/dashboard"
-            className="glass-card group block h-full rounded-2xl overflow-hidden"
-          >
+          <motion.div animate={isShaking ? shakeAnimation : {}} className="h-full">
+            <Link
+              href="/crew/dashboard"
+              className="glass-card group block h-full rounded-2xl overflow-hidden"
+            >
             <div className="p-8 h-full flex flex-col">
               <div className="p-3.5 rounded-xl bg-amber-500/15 text-amber-400 w-fit mb-6 ring-1 ring-amber-500/25 group-hover:bg-amber-500/25 group-hover:ring-amber-400/40 transition-all">
                 <Wrench size={26} />
@@ -151,15 +190,17 @@ export function CommandCenterClient({ stats }: { stats: { flightsCount: number, 
                 Open Terminal <ArrowRight className="ml-2 h-4 w-4" />
               </div>
             </div>
-          </Link>
+            </Link>
+          </motion.div>
         </motion.div>
 
         {/* Director */}
         <motion.div variants={itemVariants} whileHover={cardHover}>
-          <Link
-            href="/director/ledger"
-            className="glass-card group block h-full rounded-2xl overflow-hidden"
-          >
+          <motion.div animate={isShaking ? shakeAnimation : {}} className="h-full">
+            <Link
+              href="/director/ledger"
+              className="glass-card group block h-full rounded-2xl overflow-hidden"
+            >
             <div className="p-8 h-full flex flex-col">
               <div className="p-3.5 rounded-xl bg-purple-500/15 text-purple-400 w-fit mb-6 ring-1 ring-purple-500/25 group-hover:bg-purple-500/25 group-hover:ring-purple-400/40 transition-all">
                 <ShieldAlert size={26} />
@@ -174,7 +215,8 @@ export function CommandCenterClient({ stats }: { stats: { flightsCount: number, 
                 Access Console <ArrowRight className="ml-2 h-4 w-4" />
               </div>
             </div>
-          </Link>
+            </Link>
+          </motion.div>
         </motion.div>
       </div>
 
@@ -235,32 +277,86 @@ export function CommandCenterClient({ stats }: { stats: { flightsCount: number, 
             </h2>
             
             {loadingRisk ? (
-              <div className="text-slate-400 text-center py-8">Aggregating real-time fleet risk factors...</div>
-            ) : riskData ? (
-              <div className="space-y-6">
-                <div className="p-4 bg-slate-800 rounded-xl border border-slate-700">
-                  <div className="text-sm text-slate-400 mb-1">Fleet Average Total Risk</div>
-                  <div className="text-4xl font-black text-amber-400">{riskData.totalAverage.toFixed(2)}</div>
-                  <div className="text-xs text-slate-500 mt-2">Across {riskData.count} active tracked flights</div>
+              <div className="flex flex-col items-center justify-center py-12 gap-3 text-indigo-400">
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-full border-2 border-indigo-500/30 border-t-indigo-400 animate-spin" />
                 </div>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-3 bg-slate-800/50 rounded-lg text-center">
-                    <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Fatigue</div>
-                    <div className="text-xl font-bold text-white">{riskData.fatigueAverage.toFixed(2)}</div>
+                <p className="text-sm font-mono animate-pulse">Aggregating fleet risk telemetry...</p>
+              </div>
+            ) : riskData && riskData.count > 0 ? (
+              <div className="space-y-5">
+                {/* Total score */}
+                <div className={`p-5 rounded-xl border ${
+                  riskData.totalAverage >= 7 ? 'bg-red-950/40 border-red-800/50' :
+                  riskData.totalAverage >= 4 ? 'bg-amber-950/40 border-amber-800/50' :
+                  'bg-emerald-950/40 border-emerald-800/50'
+                }`}>
+                  <div className="flex items-end justify-between mb-2">
+                    <div className="text-xs text-slate-400 font-mono uppercase tracking-widest">Fleet Average Risk Score</div>
+                    <div className="text-xs text-slate-500 font-mono">{riskData.count} flights</div>
                   </div>
-                  <div className="p-3 bg-slate-800/50 rounded-lg text-center">
-                    <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Weather</div>
-                    <div className="text-xl font-bold text-white">{riskData.weatherAverage.toFixed(2)}</div>
+                  <div className={`text-5xl font-black font-mono ${
+                    riskData.totalAverage >= 7 ? 'text-red-400' :
+                    riskData.totalAverage >= 4 ? 'text-amber-400' :
+                    'text-emerald-400'
+                  }`}>
+                    {riskData.totalAverage.toFixed(2)}
+                    <span className="text-xl text-slate-500 font-normal">/10</span>
                   </div>
-                  <div className="p-3 bg-slate-800/50 rounded-lg text-center">
-                    <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Mechanical</div>
-                    <div className="text-xl font-bold text-white">{riskData.mechAverage.toFixed(2)}</div>
+                  {/* Total bar */}
+                  <div className="mt-3 bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        riskData.totalAverage >= 7 ? 'bg-red-500' :
+                        riskData.totalAverage >= 4 ? 'bg-amber-500' :
+                        'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, riskData.totalAverage * 10)}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 text-xs text-slate-500 font-mono">
+                    {riskData.totalAverage >= 8 ? '🔴 CRITICAL — Immediate review required' :
+                     riskData.totalAverage >= 6 ? '🟠 HIGH — Elevated operational risk' :
+                     riskData.totalAverage >= 4 ? '🟡 MODERATE — Monitor closely' :
+                     '🟢 LOW — Within acceptable parameters'}
                   </div>
                 </div>
+
+                {/* Factor breakdown */}
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: 'Fatigue', value: riskData.fatigueAverage, color: 'text-purple-400', bar: 'bg-purple-500', icon: '😴' },
+                    { label: 'Weather', value: riskData.weatherAverage, color: 'text-blue-400', bar: 'bg-blue-500', icon: '⛈' },
+                    { label: 'Mechanical', value: riskData.mechAverage, color: 'text-orange-400', bar: 'bg-orange-500', icon: '⚙' },
+                  ].map(({ label, value, color, bar, icon }) => (
+                    <div key={label} className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                      <div className="flex items-center gap-1 mb-1">
+                        <span className="text-xs">{icon}</span>
+                        <div className="text-[9px] text-slate-400 uppercase tracking-widest font-mono">{label}</div>
+                      </div>
+                      <div className={`text-xl font-extrabold font-mono ${color}`}>
+                        {value.toFixed(2)}
+                        <span className="text-xs text-slate-600 font-normal">/10</span>
+                      </div>
+                      <div className="mt-2 bg-slate-700 rounded-full h-1 overflow-hidden">
+                        <div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.min(100, value * 10)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[10px] text-slate-600 font-mono text-center">
+                  Scores derived from route risk, incidents, weather records &amp; crew fatigue indices · Recalculated on load
+                </p>
+              </div>
+            ) : riskData && riskData.count === 0 ? (
+              <div className="text-center py-10 text-slate-500 font-mono">
+                <ShieldAlert className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">No monitored flights to analyze.</p>
+                <p className="text-xs text-slate-600 mt-1">Add flights in the Internal Fleet Monitor to see risk scores.</p>
               </div>
             ) : (
-              <div className="text-red-400 text-center py-8">Failed to load risk factors.</div>
+              <div className="text-red-400 text-center py-8 font-mono text-sm">Failed to load risk data.</div>
             )}
           </motion.div>
         </motion.div>

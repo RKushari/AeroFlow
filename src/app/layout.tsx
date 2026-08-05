@@ -7,6 +7,8 @@ import ProfileDropdown from "@/components/profile-dropdown";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 
+import { PageTransition } from '@/components/animations/page-transition';
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -48,7 +50,9 @@ export default async function RootLayout({
               </div>
             </header>
             <main className="flex-1 p-4 md:p-8 max-w-6xl mx-auto w-full">
-              {children}
+              <PageTransition>
+                {children}
+              </PageTransition>
             </main>
           </div>
         </ThemeProvider>

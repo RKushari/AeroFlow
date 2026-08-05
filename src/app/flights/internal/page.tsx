@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
-import { ArrowLeft, Shield } from "lucide-react";
+import { ArrowLeft, Shield, Radio, Cpu, Globe2, Activity } from "lucide-react";
 import { requireRole } from "@/lib/auth";
 import { InternalFlightsCard } from "../internal-flights-card";
+import { getMonitoredFlightIds } from "@/lib/actions/risk-analytics";
 
 export const dynamic = 'force-dynamic';
 
@@ -10,53 +11,100 @@ export default async function InternalFlightsPage() {
   await requireRole(['FLIGHT_DISPATCHER', 'OPERATIONS_DIRECTOR', 'GROUND_CREW_LEAD']);
 
   let flights = await db.flights.findMany({
-    include: {
-      route: true
-    },
-    orderBy: {
-      flightNumber: 'asc'
-    }
+    include: { route: true },
+    orderBy: { flightNumber: 'asc' }
   });
 
+  let initialMonitoredIds = await getMonitoredFlightIds();
+  if (!initialMonitoredIds) {
+    initialMonitoredIds = flights.map(f => f.id);
+  }
+
+  const monitoredCount = initialMonitoredIds?.length ?? 0;
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' });
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black">
-      <div className="max-w-7xl mx-auto flex flex-col gap-8">
-        
-        {/* Command Deck Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-2xl">
+    <div className="min-h-screen bg-[#06090f] text-slate-100 relative overflow-hidden">
+      {/* Subtle grid background */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(99,102,241,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(99,102,241,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-indigo-600/5 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-6 md:px-8 py-6 flex flex-col gap-6">
+
+        {/* ─── System Status Bar ─── */}
+        <div className="flex items-center justify-between text-[10px] font-mono text-slate-600 px-1">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-amber-600 to-orange-600 text-white rounded-xl shadow-lg shadow-amber-900/40">
-              <Shield className="h-7 w-7" />
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              SYS NOMINAL
+            </span>
+            <span>UTC {timeStr}</span>
+            <span>{dateStr}</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-indigo-400/60">AeroFlow IFFMS v2.4.1</span>
+          </div>
+        </div>
+
+        {/* ─── Page Header ─── */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-5">
+            {/* Icon stack */}
+            <div className="relative">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-900/40">
+                <Shield className="h-7 w-7 text-white" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-lg bg-indigo-600 border-2 border-[#06090f] flex items-center justify-center">
+                <Activity className="h-2.5 w-2.5 text-white" />
+              </div>
             </div>
+
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white font-mono">
-                  INTERNAL FLEET MONITOR
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white font-mono uppercase">
+                  Internal Fleet Monitor
                 </h1>
-                <span className="px-2.5 py-1 text-[10px] font-bold font-mono rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  SECURE DECK
+                <span className="px-2.5 py-1 text-[9px] font-extrabold tracking-widest rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase">
+                  Secure Deck
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1 font-mono flex items-center gap-2">
-                <span>AeroFlow Corporate & Fleet Aviation Tracking</span>
-              </p>
+              <div className="flex items-center gap-3 text-[11px] font-mono text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <Cpu className="h-3 w-3 text-indigo-400" />
+                  Corporate &amp; Fleet Aviation Surveillance
+                </span>
+                <span className="text-slate-700">·</span>
+                <span className="flex items-center gap-1.5">
+                  <Radio className="h-3 w-3 text-emerald-400" />
+                  OpenSky Integration Active
+                </span>
+                <span className="text-slate-700">·</span>
+                <span className="flex items-center gap-1.5">
+                  <Globe2 className="h-3 w-3 text-cyan-400" />
+                  {monitoredCount} Flights Enrolled
+                </span>
+              </div>
             </div>
           </div>
 
-          <Link 
-            href="/flights" 
-            className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/80 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 shadow-lg"
+          <Link
+            href="/flights"
+            className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold font-mono text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/60 hover:border-slate-600 rounded-xl transition-all"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5" />
             Return to Active Radar
           </Link>
         </div>
 
-        {/* AeroFlow Internal Monitored Flights */}
-        <div className="w-full">
-          <InternalFlightsCard flights={flights} />
-        </div>
+        {/* ─── Main Card ─── */}
+        <InternalFlightsCard flights={flights} initialMonitoredIds={initialMonitoredIds} />
 
+        {/* ─── Footer note ─── */}
+        <p className="text-center text-[10px] font-mono text-slate-700 pb-4">
+          AeroFlow Internal Fleet Monitoring System (IFFMS) · Data sourced from OpenSky Network · For authorized personnel only
+        </p>
       </div>
     </div>
   );
