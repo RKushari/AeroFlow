@@ -513,7 +513,7 @@ export function LiveFlights() {
               <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
                 <div className="flex flex-col">
                   <span className="text-xs text-slate-400 font-sans mb-0.5">Last position update</span>
-                  <span className="text-sm font-sans">{selectedFlight.timePosition ? new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(new Date(selectedFlight.timePosition * 1000)) : '?'} [0s]</span>
+                  <span className="text-sm font-sans">{(selectedFlight as any).timePosition ? new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(new Date((selectedFlight as any).timePosition * 1000)) : '?'} [0s]</span>
                 </div>
                 
                 <div className="flex flex-col">

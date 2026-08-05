@@ -70,8 +70,6 @@ export function FlightSimulator3D() {
               title="Boeing 737-800" 
               className="w-full h-full border-0"
               allowFullScreen 
-              mozallowfullscreen="true" 
-              webkitallowfullscreen="true" 
               allow="autoplay; fullscreen; xr-spatial-tracking" 
               src="https://sketchfab.com/models/7a548b5ba64340f78f7c58d23781ffe9/embed?ui_theme=dark&autostart=1" 
             />

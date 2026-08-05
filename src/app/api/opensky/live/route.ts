@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Enrich with origin and destination airports
-    const enriched = states.map((s: any, i: number) => {
+    const enriched = (states as any[] || []).map((s: any, i: number) => {
       const origIdx = i % MAJOR_AIRPORTS.length;
       const destIdx = (i + 4) % MAJOR_AIRPORTS.length;
       return {
