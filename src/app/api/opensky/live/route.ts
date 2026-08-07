@@ -24,8 +24,14 @@ export async function GET(req: NextRequest) {
     const lamax = searchParams.get('lamax');
     const lomax = searchParams.get('lomax');
 
-    let bbox = null;
-    let cacheKey = 'states:global';
+    let bbox = { 
+      // Default to North America to prevent massive 10MB payloads and Vercel timeouts
+      lamin: 24.396308, 
+      lomin: -125.0, 
+      lamax: 49.384358, 
+      lomax: -66.93457
+    };
+    let cacheKey = 'states:na';
 
     if (lamin && lomin && lamax && lomax) {
       bbox = { 
@@ -60,7 +66,12 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ source: 'live', data: enriched, creditsRemaining: openSky.creditsRemaining });
   } catch (error: any) {
-    if (error?.response?.status === 429 || error?.message?.includes('429') || error?.message?.includes('Rate Limit')) {
+    // If it's a rate limit (429), a timeout, or any other fetch error from OpenSky, safely fall back to mock data
+    // to prevent the Vercel API from throwing a 500 and breaking the UI.
+    const isRateLimit = error?.response?.status === 429 || error?.message?.includes('429') || error?.message?.includes('Rate Limit');
+    const isTimeout = error?.code === 'ECONNABORTED' || error?.message?.includes('timeout');
+    
+    if (isRateLimit || isTimeout || !error.response) {
       const mockData = Array.from({ length: 300 }).map((_, i) => {
         const origIdx = i % MAJOR_AIRPORTS.length;
         const destIdx = (i + 4) % MAJOR_AIRPORTS.length;
