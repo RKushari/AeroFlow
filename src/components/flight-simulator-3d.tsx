@@ -61,7 +61,7 @@ export function FlightSimulator3D() {
       </div>
 
       {/* Main Container Content */}
-      <div className="w-full h-full pt-16 relative bg-slate-950">
+      <div className="w-full h-full pt-[110px] relative bg-slate-950">
         
         {/* 3D Sketchfab Interactive Model */}
         {activeTab === '3D' && (
@@ -91,7 +91,7 @@ export function FlightSimulator3D() {
               <Shield className="h-6 w-6 text-blue-400" />
               <div>
                 <h4 className="text-lg font-bold text-white">Boeing 737-800 Technical Specifications</h4>
-                <p className="text-xs text-slate-400">Commercial Narrow-Body Twin-Engine Jet Airliner</p>
+                <p className="text-xs text-white font-medium">Commercial Narrow-Body Twin-Engine Jet Airliner</p>
               </div>
             </div>
 
@@ -142,7 +142,7 @@ export function FlightSimulator3D() {
               <Wrench className="h-6 w-6 text-amber-400" />
               <div>
                 <h4 className="text-lg font-bold text-white">3D Airframe Walkaround Inspection Routing</h4>
-                <p className="text-xs text-slate-400">Mandatory Ground Crew Visual Safety Audit Points</p>
+                <p className="text-xs text-amber-300 font-medium">Mandatory Ground Crew Visual Safety Audit Points</p>
               </div>
             </div>
 

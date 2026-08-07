@@ -4,12 +4,15 @@ import { completeChecklistItem, submitShiftLog } from "@/lib/actions/crew";
 import { seedDummyEquipment, logEquipmentMaintenance } from "@/lib/actions/equipment";
 import { FlightSimulator3D } from "@/components/flight-simulator-3d";
 import { Shield, Wrench, Plane, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+// 👇 Member 2 imports - Equipment Management (UPDATED - USING EquipmentSection)
+import { EquipmentSection } from "@/components/equipment/EquipmentSection";
 
 export const dynamic = 'force-dynamic';
 
 export default async function CrewDashboard() {
   const session = await requireRole(['GROUND_CREW_LEAD', 'OPERATIONS_DIRECTOR']);
 
+  // Fetch scheduled flights with checklists and crew assignments
   let flights = await db.flights.findMany({
     where: {
       status: 'SCHEDULED'
@@ -20,21 +23,25 @@ export default async function CrewDashboard() {
     },
   });
 
+  // Fetch all ground equipment - ORDER BY NEWEST FIRST
   let equipment = await db.groundEquipment.findMany({
-    orderBy: { identifier: 'asc' }
+    orderBy: { createdAt: 'desc' }  
   });
 
+  // Seed dummy equipment if none exists
   if (equipment.length === 0) {
     await seedDummyEquipment();
     equipment = await db.groundEquipment.findMany({
-      orderBy: { identifier: 'asc' }
+      orderBy: { createdAt: 'desc' }  
     });
   }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black flex flex-col gap-8">
       
-      {/* Header */}
+      {/* ============================================ */}
+      {/* HEADER SECTION */}
+      {/* ============================================ */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-2xl">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-xl shadow-lg shadow-amber-900/30">
@@ -57,7 +64,9 @@ export default async function CrewDashboard() {
         </div>
       </div>
 
-      {/* 3D Boeing 737 Flight Simulator Deck */}
+      {/* ============================================ */}
+      {/* 3D BOEING 737 FLIGHT SIMULATOR DECK */}
+      {/* ============================================ */}
       <div className="w-full space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold font-mono flex items-center gap-2 text-slate-200">
@@ -70,7 +79,9 @@ export default async function CrewDashboard() {
         <FlightSimulator3D />
       </div>
 
-      {/* Scheduled Flights & Pre-Flight Checklists */}
+      {/* ============================================ */}
+      {/* SCHEDULED FLIGHTS & PRE-FLIGHT CHECKLISTS */}
+      {/* ============================================ */}
       <div className="space-y-4">
         <h2 className="text-lg font-bold font-mono flex items-center gap-2 text-slate-200">
           <Clock className="h-5 w-5 text-emerald-400" /> Scheduled Flight Pre-Flight Checklists
@@ -154,50 +165,21 @@ export default async function CrewDashboard() {
         </div>
       </div>
 
-      {/* Ground Equipment Status Board */}
+      {/* ============================================ */}
+      {/* 🚀 GROUND SUPPORT EQUIPMENT REGISTRY - Member 2 */}
+      {/* ============================================ */}
       <div className="space-y-4">
-        <h2 className="text-lg font-bold font-mono flex items-center gap-2 text-slate-200">
-          <Wrench className="h-5 w-5 text-amber-400" /> Ground Support Equipment (GSE) Status Board
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono">
-          {equipment.map(eq => (
-            <div key={eq.id} className="p-5 bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl flex flex-col gap-3 shadow-xl">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
-                <span className="font-bold text-white text-sm flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-blue-400" /> {eq.identifier}
-                </span>
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border ${
-                  eq.status === 'CRITICAL' ? 'bg-red-950/60 text-red-300 border-red-800/50' :
-                  eq.status === 'HIGH' ? 'bg-orange-950/60 text-orange-300 border-orange-800/50' :
-                  eq.status === 'MEDIUM' ? 'bg-amber-950/60 text-amber-300 border-amber-800/50' :
-                  'bg-emerald-950/60 text-emerald-300 border-emerald-800/50'
-                }`}>
-                  {eq.status === 'LOW' ? 'OPERATIONAL' : eq.status}
-                </span>
-              </div>
-              <form action={async (formData: FormData) => {
-                'use server';
-                const status = formData.get('status') as any;
-                const notes = formData.get('notes') as string;
-                if (notes) {
-                  await logEquipmentMaintenance(eq.id, notes, status);
-                }
-              }} className="flex gap-2">
-                <select name="status" defaultValue={eq.status} className="border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs bg-slate-950 text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
-                  <option value="LOW">Operational</option>
-                  <option value="MEDIUM font-mono">Maintenance Needed</option>
-                  <option value="HIGH">Degraded</option>
-                  <option value="CRITICAL">Out of Service</option>
-                </select>
-                <input type="text" name="notes" placeholder="Log maintenance notes..." required className="flex-1 border border-slate-700 bg-slate-950 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                <button type="submit" className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-blue-900/30">
-                  Log
-                </button>
-              </form>
-            </div>
-          ))}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold font-mono flex items-center gap-2 text-slate-200">
+            <Wrench className="h-5 w-5 text-amber-400" /> Ground Support Equipment (GSE) Registry
+          </h2>
+          <span className="text-xs text-slate-400 font-mono bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
+            {equipment.length} items
+          </span>
         </div>
+
+        {/* Equipment Section with Live Updates - Member 2 */}
+        <EquipmentSection initialEquipment={equipment} />
       </div>
 
     </div>
