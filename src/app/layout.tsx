@@ -21,7 +21,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await getSession();
+  let session = null;
+  try {
+    session = await getSession();
+  } catch (err) {
+    console.error("Failed to load session:", err);
+  }
 
   return (
     <html lang="en" suppressHydrationWarning>
