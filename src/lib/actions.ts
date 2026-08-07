@@ -97,27 +97,13 @@ export async function updateChecklistItem(data: any) {
   });
 }
 
+import { createGroundIncident } from './actions/incidents';
+
 export async function reportIncident(data: any) {
-  const session = await requireRole(['GROUND_CREW_LEAD', 'FLIGHT_DISPATCHER', 'OPERATIONS_DIRECTOR']);
-  const parsed = IncidentReportSchema.parse(data);
-
-  return await db.$transaction(async (tx) => {
-    const incident = await tx.incidents.create({
-      data: {
-        flightId: parsed.flightId,
-        reporterId: session.user.id,
-        severity: parsed.severity,
-      }
-    });
-    await calculateRisk(parsed.flightId, tx);
-
-    eventBus.emit('alert_broadcast', {
-      type: 'INCIDENT_REPORTED',
-      flightId: parsed.flightId,
-      severity: parsed.severity,
-      timestamp: new Date().toISOString()
-    });
-
-    return incident;
+  return await createGroundIncident({
+    flightId: data.flightId || null,
+    type: data.type || 'HAZARD',
+    description: data.description || 'Ground safety incident reported.',
+    severity: data.severity,
   });
 }

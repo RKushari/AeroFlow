@@ -6,6 +6,7 @@ import { db } from "./db";
 import { redirect } from "next/navigation";
 
 export const authOptions: AuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET || "aeroflow-super-secret-key-production-development-2026",
   providers: [
     CredentialsProvider({
       name: "Credentials",

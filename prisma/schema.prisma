@@ -46,7 +46,8 @@ model Users {
   password String?
   phone String?
   shiftLogs ShiftLogs[]
-  incidents Incidents[]
+  reportedIncidents Incidents[] @relation("ReportedIncidents")
+  resolvedIncidents Incidents[] @relation("ResolvedIncidents")
   approvals DispatchApprovals[]
   assignedFlights Flights[]
   preferences DashboardPreferences?
@@ -144,12 +145,20 @@ model WeatherApiCache {
 
 model Incidents {
   id String @id @default(uuid())
-  flightId String
-  flight Flights @relation(fields: [flightId], references: [id])
+  flightId String?
+  flight Flights? @relation(fields: [flightId], references: [id])
   reporterId String
-  reporter Users @relation(fields: [reporterId], references: [id])
+  reporter Users @relation("ReportedIncidents", fields: [reporterId], references: [id])
+  type String @default("OTHER")
+  description String @default("")
   severity Severity
   resolved Boolean @default(false)
+  resolutionNotes String?
+  resolvedAt DateTime?
+  resolvedById String?
+  resolvedBy Users? @relation("ResolvedIncidents", fields: [resolvedById], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model AlertLogs {

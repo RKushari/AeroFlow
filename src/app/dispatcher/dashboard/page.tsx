@@ -32,12 +32,25 @@ export default async function DispatcherDashboard() {
     unreadAlertsCount = await db.alertLogs.count({ where: { read: false } });
   }
 
+  const activeIncidentsCount = await db.incidents.count({ where: { resolved: false } });
+
   return (
     <div className="flex flex-col gap-6">
       <SSEBanners />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Readiness Cockpit</h1>
         <div className="flex gap-2">
+          <Link 
+            href="/incidents" 
+            className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 shadow-md shadow-red-950/30"
+          >
+            <span>Ground Incidents</span>
+            {activeIncidentsCount > 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-extrabold bg-white text-red-700 rounded-full font-mono">
+                {activeIncidentsCount}
+              </span>
+            )}
+          </Link>
           <Link 
             href="/dispatcher/flights/new" 
             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
