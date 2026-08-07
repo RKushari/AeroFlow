@@ -21,6 +21,7 @@ export async function calculateRisk(flightId: string, tx: Prisma.TransactionClie
       checklists: { include: { items: true } },
       weather: { orderBy: { id: 'desc' }, take: 1 },
       incidents: { where: { resolved: false } },
+      crewUsers: { include: { shiftLogs: { orderBy: { startTime: 'desc' }, take: 1 } } }
     }
   });
 
@@ -28,14 +29,10 @@ export async function calculateRisk(flightId: string, tx: Prisma.TransactionClie
 
   // 1. Fatigue (Fs)
   // Average fatigue index of assigned crew. Default to 0 if none.
-  const crewUsers = await tx.users.findMany({
-    where: { assignedFlights: { some: { id: flightId } } },
-    include: { shiftLogs: { orderBy: { startTime: 'desc' }, take: 1 } }
-  });
-
-  const shiftLogs = crewUsers.map(u => u.shiftLogs[0]).filter(Boolean);
+  const crewUsers = flight.crewUsers || [];
+  const shiftLogs = crewUsers.map((u: any) => u.shiftLogs?.[0]).filter(Boolean);
   const Fs = shiftLogs.length > 0 
-    ? shiftLogs.reduce((acc, log) => acc + log.fatigueIndex, 0) / shiftLogs.length 
+    ? shiftLogs.reduce((acc: number, log: any) => acc + log.fatigueIndex, 0) / shiftLogs.length 
     : 0.0;
 
   // 2. Weather (Wi)

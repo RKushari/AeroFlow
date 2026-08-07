@@ -69,10 +69,30 @@ export async function completeChecklistItem(itemId: string) {
   });
 }
 
-export async function submitShiftLog(flightId: string, fatigueIndex: number) {
-  const session = await requireRole(['GROUND_CREW_LEAD']);
+import { calculateFatigueIndex } from '../fatigue';
 
-  if (flightId.startsWith('mock-uuid-')) {
+export async function submitShiftLog(
+  flightId?: string,
+  wakeTime?: string | null,
+  workDurationHours: number = 8,
+  alertnessScore: number = 5,
+  manualFatigueIndex?: number
+) {
+  const session = await requireRole(['GROUND_CREW_LEAD', 'OPERATIONS_DIRECTOR']);
+
+  const wakeDate = wakeTime ? new Date(wakeTime) : null;
+  const evaluation = calculateFatigueIndex({
+    wakeTime: wakeDate,
+    workDurationHours,
+    alertnessScore,
+    startTime: new Date(),
+  });
+
+  const finalFatigueIndex = typeof manualFatigueIndex === 'number' && manualFatigueIndex > 0
+    ? manualFatigueIndex
+    : evaluation.fatigueIndex;
+
+  if (flightId && flightId.startsWith('mock-uuid-')) {
     const globalAny = global as any;
     if (globalAny.mockFlights) {
       const flight = globalAny.mockFlights.find((f: any) => f.id === flightId);
@@ -84,7 +104,17 @@ export async function submitShiftLog(flightId: string, fatigueIndex: number) {
       }
     }
     revalidatePath('/crew/dashboard');
-    return { id: 'mock-shift-log', userId: session.user.id, fatigueIndex, startTime: new Date() };
+    return {
+      id: 'mock-shift-log',
+      userId: session.user.id,
+      wakeTime: wakeDate,
+      workDurationHours,
+      alertnessScore,
+      fatigueIndex: finalFatigueIndex,
+      isFlagged: evaluation.isFlagged,
+      flagReason: evaluation.flagReason,
+      startTime: new Date()
+    };
   }
 
   return await db.$transaction(async (tx) => {
@@ -92,22 +122,29 @@ export async function submitShiftLog(flightId: string, fatigueIndex: number) {
       data: {
         userId: session.user.id,
         startTime: new Date(),
-        fatigueIndex,
+        wakeTime: wakeDate,
+        workDurationHours,
+        alertnessScore,
+        fatigueIndex: finalFatigueIndex,
+        isFlagged: evaluation.isFlagged,
+        flagReason: evaluation.flagReason,
       }
     });
 
-    const flight = await tx.flights.findUnique({
-      where: { id: flightId },
-      include: { crewUsers: true }
-    });
-
-    if (flight && !flight.crewUsers.find(u => u.id === session.user.id)) {
-      await tx.flights.update({
+    if (flightId) {
+      const flight = await tx.flights.findUnique({
         where: { id: flightId },
-        data: {
-          crewUsers: { connect: { id: session.user.id } }
-        }
+        include: { crewUsers: true }
       });
+
+      if (flight && !flight.crewUsers.find(u => u.id === session.user.id)) {
+        await tx.flights.update({
+          where: { id: flightId },
+          data: {
+            crewUsers: { connect: { id: session.user.id } }
+          }
+        });
+      }
     }
 
     await logAudit(
@@ -121,5 +158,69 @@ export async function submitShiftLog(flightId: string, fatigueIndex: number) {
 
     revalidatePath('/crew/dashboard');
     return log;
+  });
+}
+
+export async function updateShiftLog(
+  logId: string,
+  wakeTime?: string | null,
+  workDurationHours: number = 8,
+  alertnessScore: number = 5
+) {
+  const session = await requireRole(['GROUND_CREW_LEAD', 'OPERATIONS_DIRECTOR']);
+
+  const existing = await db.shiftLogs.findUnique({
+    where: { id: logId }
+  });
+
+  if (!existing) {
+    throw new Error('Shift log record not found');
+  }
+
+  // Ensure user can only edit their own logs unless they are OPERATIONS_DIRECTOR
+  if (existing.userId !== session.user.id && session.user.role !== 'OPERATIONS_DIRECTOR') {
+    throw new Error('Unauthorized to edit this shift log');
+  }
+
+  const wakeDate = wakeTime ? new Date(wakeTime) : null;
+  const evaluation = calculateFatigueIndex({
+    wakeTime: wakeDate,
+    workDurationHours,
+    alertnessScore,
+    startTime: existing.startTime || new Date(),
+  });
+
+  return await db.$transaction(async (tx) => {
+    const updated = await tx.shiftLogs.update({
+      where: { id: logId },
+      data: {
+        wakeTime: wakeDate,
+        workDurationHours,
+        alertnessScore,
+        fatigueIndex: evaluation.fatigueIndex,
+        isFlagged: evaluation.isFlagged,
+        flagReason: evaluation.flagReason,
+      }
+    });
+
+    await logAudit(
+      session.user.id,
+      'SHIFT_LOG_UPDATED',
+      logId,
+      existing,
+      updated,
+      tx
+    );
+
+    revalidatePath('/crew/dashboard');
+    return updated;
+  });
+}
+
+export async function getUserShiftLogs(userId: string) {
+  return await db.shiftLogs.findMany({
+    where: { userId },
+    orderBy: { startTime: 'desc' },
+    take: 20,
   });
 }
