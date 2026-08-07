@@ -11,28 +11,47 @@ export const dynamic = 'force-dynamic';
 export default async function CrewDashboard() {
   const session = await requireRole(['GROUND_CREW_LEAD', 'OPERATIONS_DIRECTOR']);
 
-  let flights = await db.flights.findMany({
-    where: {
-      status: 'SCHEDULED'
-    },
-    include: {
-      checklists: { include: { items: true } },
-      crewUsers: true,
-    },
-  });
+  let flights: any[] = [];
+  let equipment: any[] = [];
+  let shiftLogs: any[] = [];
+  let errorMessage = null;
 
-  let equipment = await db.groundEquipment.findMany({
-    orderBy: { identifier: 'asc' }
-  });
+  try {
+    flights = await db.flights.findMany({
+      where: {
+        status: 'SCHEDULED'
+      },
+      include: {
+        checklists: { include: { items: true } },
+        crewUsers: true,
+      },
+    });
 
-  if (equipment.length === 0) {
-    await seedDummyEquipment();
     equipment = await db.groundEquipment.findMany({
       orderBy: { identifier: 'asc' }
     });
+
+    if (equipment.length === 0) {
+      await seedDummyEquipment();
+      equipment = await db.groundEquipment.findMany({
+        orderBy: { identifier: 'asc' }
+      });
+    }
+
+    shiftLogs = await getUserShiftLogs(session.user.id);
+  } catch (err: any) {
+    console.error("Crew Dashboard Error:", err);
+    errorMessage = err.message || String(err);
   }
 
-  const shiftLogs = await getUserShiftLogs(session.user.id);
+  if (errorMessage) {
+    return (
+      <div className="p-8 text-red-500 bg-red-950/20 border border-red-800 rounded-2xl m-8 font-mono">
+        <h2 className="text-xl font-bold mb-4">Dashboard Error</h2>
+        <p>{errorMessage}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black flex flex-col gap-8">
