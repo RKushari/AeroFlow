@@ -36,6 +36,5 @@ export async function seedDummyEquipment() {
         { identifier: 'Belt Loader D-09', status: 'LOW' },
       ]
     });
-    revalidatePath('/crew/dashboard');
   }
 }

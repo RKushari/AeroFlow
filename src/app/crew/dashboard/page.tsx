@@ -1,9 +1,10 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { completeChecklistItem, submitShiftLog } from "@/lib/actions/crew";
+import { completeChecklistItem, getUserShiftLogs } from "@/lib/actions/crew";
 import { seedDummyEquipment, logEquipmentMaintenance } from "@/lib/actions/equipment";
 import { FlightSimulator3D } from "@/components/flight-simulator-3d";
-import { Shield, Wrench, Plane, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { ShiftLoggerClient } from "./shift-logger-client";
+import { Shield, Wrench, Plane, CheckCircle2, Clock } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,8 @@ export default async function CrewDashboard() {
     });
   }
 
+  const shiftLogs = await getUserShiftLogs(session.user.id);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black flex flex-col gap-8">
       
@@ -51,11 +54,14 @@ export default async function CrewDashboard() {
             </div>
             <p className="text-xs text-slate-400 mt-1 font-mono flex items-center gap-2">
               <Shield className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Pre-Flight Readiness, Checklist Verification & Equipment Telemetry</span>
+              <span>Pre-Flight Readiness, Fatigue Evaluation & Equipment Telemetry</span>
             </p>
           </div>
         </div>
       </div>
+
+      {/* Crew Fatigue Evaluation & Shift Logger Component */}
+      <ShiftLoggerClient initialLogs={shiftLogs} />
 
       {/* 3D Boeing 737 Flight Simulator Deck */}
       <div className="w-full space-y-3">
@@ -125,22 +131,6 @@ export default async function CrewDashboard() {
                     ))}
                   </div>
                 </div>
-
-                {!isAssigned && (
-                  <div className="pt-4 border-t border-slate-800">
-                    <form action={async (formData: FormData) => {
-                      'use server';
-                      const fatigue = parseInt(formData.get('fatigue') as string || '0', 10);
-                      await submitShiftLog(flight.id, fatigue);
-                    }} className="flex items-center gap-3 font-mono">
-                      <label className="text-xs text-slate-400">Fatigue Index (0-10):</label>
-                      <input type="number" name="fatigue" min="0" max="10" defaultValue="3" className="w-14 border border-slate-700 bg-slate-950 rounded-lg px-2 py-1 text-xs text-white" />
-                      <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold font-mono transition-colors shadow-lg shadow-blue-900/30">
-                        Clock In
-                      </button>
-                    </form>
-                  </div>
-                )}
                 
                 {isAssigned && (
                   <div className="pt-3 border-t border-slate-800 text-xs text-emerald-400 font-mono font-bold flex items-center gap-1.5">
@@ -186,7 +176,7 @@ export default async function CrewDashboard() {
               }} className="flex gap-2">
                 <select name="status" defaultValue={eq.status} className="border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs bg-slate-950 text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
                   <option value="LOW">Operational</option>
-                  <option value="MEDIUM font-mono">Maintenance Needed</option>
+                  <option value="MEDIUM">Maintenance Needed</option>
                   <option value="HIGH">Degraded</option>
                   <option value="CRITICAL">Out of Service</option>
                 </select>
