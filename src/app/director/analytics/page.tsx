@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { AnalyticsWrapper } from "./analytics-wrapper";
 import { mockKpiAnalytics } from "@/lib/mock-data";
+import { normalizeDashboardLayout } from "./layout-utils";
 
 export default async function AnalyticsPage() {
   const session = await requireRole(['OPERATIONS_DIRECTOR']);
@@ -74,7 +75,7 @@ export default async function AnalyticsPage() {
         riskData={flights.length > 0 ? riskData.slice(0, 10) : mockKpiAnalytics.riskData}
         fatigueData={shiftLogs.length > 0 ? fatigueData.slice(0, 10) : mockKpiAnalytics.fatigueData}
         checklistData={flights.length > 0 ? checklistData.slice(0, 10) : mockKpiAnalytics.checklistData}
-        initialLayout={preferences?.layoutConfig ? (preferences.layoutConfig as any).layout : null}
+        initialLayout={normalizeDashboardLayout(preferences?.layoutConfig ? (preferences.layoutConfig as any).layout : null)}
       />
     </div>
   );

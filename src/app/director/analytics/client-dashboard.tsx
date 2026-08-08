@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { StaggerContainer, StaggerItem } from "@/components/animations/stagger-container";
+import { normalizeDashboardLayout } from "./layout-utils";
 
 export function AnalyticsDashboard({ 
   userId, 
@@ -19,7 +20,11 @@ export function AnalyticsDashboard({
   checklistData: any[];
   initialLayout: any;
 }) {
-  const [layout, setLayout] = useState(initialLayout || ['incidents', 'risk', 'fatigue', 'checklists']);
+  const [layout, setLayout] = useState<string[]>(() => normalizeDashboardLayout(initialLayout));
+
+  useEffect(() => {
+    setLayout((currentLayout) => normalizeDashboardLayout(currentLayout.length > 0 ? currentLayout : initialLayout));
+  }, [initialLayout]);
 
   const saveLayout = async (newLayout: string[]) => {
     setLayout(newLayout);
