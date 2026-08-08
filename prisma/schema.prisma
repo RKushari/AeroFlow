@@ -70,6 +70,7 @@ model Flights {
   crewUsers Users[]
   risk RiskCalculations?
   briefings SafetyBriefings[]
+  groundEquipment GroundEquipment[]
 }
 
 model DispatchPlans {
@@ -99,8 +100,13 @@ model ChecklistItems {
 model GroundEquipment {
   id String @id @default(uuid())
   identifier String
+  type String
   status Severity
+  flightId String?  @map("flight_id")
+  flight Flights? @relation(fields: [flightId], references: [id])
   maintenanceLogs EquipmentMaintenanceLogs[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model EquipmentMaintenanceLogs {
