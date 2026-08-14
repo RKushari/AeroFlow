@@ -145,7 +145,8 @@ export async function GET(req: NextRequest) {
     const clientId = process.env.OPENSKY_CLIENT_ID;
     const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
     if (clientId && clientSecret) {
-      headers['Authorization'] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
+      // Use standard btoa instead of Buffer to ensure compatibility across all Vercel runtimes
+      headers['Authorization'] = `Basic ${btoa(`${clientId}:${clientSecret}`)}`;
     }
 
     // ============================================================
@@ -165,10 +166,14 @@ export async function GET(req: NextRequest) {
     });
 
     if (!upstreamRes.ok) {
+      const errorText = await upstreamRes.text().catch(() => 'No body');
+      console.error(`[OPENSKY_ERROR] Status: ${upstreamRes.status} ${upstreamRes.statusText}`);
+      console.error(`[OPENSKY_ERROR] Headers:`, Object.fromEntries(upstreamRes.headers.entries()));
+      console.error(`[OPENSKY_ERROR] Body: ${errorText}`);
       if (upstreamRes.status === 429) {
         throw new Error('429 Rate Limit');
       }
-      throw new Error(`OpenSky returned ${upstreamRes.status}`);
+      throw new Error(`OpenSky returned ${upstreamRes.status}: ${errorText}`);
     }
 
     const data = await upstreamRes.json();
