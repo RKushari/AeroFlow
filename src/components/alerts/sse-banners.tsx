@@ -55,11 +55,23 @@ export function SSEBanners() {
               timestamp: data.timestamp,
             };
           } else if (data.type === "INCIDENT_REPORTED") {
+            const flightInfo = data.flightId ? ` (Flight ${data.flightId})` : '';
+            const typeInfo = data.incidentType ? ` [${data.incidentType.replace(/_/g, " ")}]` : '';
+            const desc = data.description ? `: ${data.description}` : '';
             newAlert = {
-              id: `${data.flightId}-${Date.now()}`,
-              type: data.type,
-              message: `NEW INCIDENT: A ${data.severity} incident has been reported for Flight ${data.flightId}.`,
+              id: `inc-${data.incidentId || Date.now()}`,
+              type: "HIGH PRIORITY GROUND INCIDENT",
+              message: `HAZARD ALERT${typeInfo}${flightInfo}${desc}`,
               severity: data.severity === "CRITICAL" || data.severity === "HIGH" ? "critical" : "warning",
+              timestamp: data.timestamp,
+            };
+          } else if (data.type === "INCIDENT_RESOLVED") {
+            const flightInfo = data.flightId ? ` (Flight ${data.flightId})` : '';
+            newAlert = {
+              id: `inc-res-${data.incidentId || Date.now()}`,
+              type: "INCIDENT RESOLVED",
+              message: `Ground Incident Resolved${flightInfo} by ${data.resolverName || 'Supervisor'}. Notes: ${data.resolutionNotes}`,
+              severity: "info",
               timestamp: data.timestamp,
             };
           } else if (data.type === "DISPATCH_APPROVED") {

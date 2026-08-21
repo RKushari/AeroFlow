@@ -22,9 +22,23 @@ export const ChecklistItemUpdateSchema = z.object({
 });
 
 export const IncidentReportSchema = z.object({
-  flightId: z.string().uuid(),
+  flightId: z.string().optional().nullable(),
+  type: z.string().min(2).default('OTHER'),
   severity: z.nativeEnum(Severity),
-  description: z.string().min(10),
+  description: z.string().min(5, 'Description must be at least 5 characters.'),
+});
+
+export const RapidGroundIncidentSchema = z.object({
+  flightId: z.string().optional().nullable(),
+  type: z.string().min(2, 'Incident type is required.'),
+  severity: z.nativeEnum(Severity),
+  description: z.string().min(5, 'Description must be at least 5 characters.'),
+});
+
+export const UpdateIncidentResolutionSchema = z.object({
+  incidentId: z.string().min(1, 'Incident ID is required.'),
+  resolutionNotes: z.string().min(3, 'Resolution notes must be at least 3 characters.'),
+  resolved: z.boolean(),
 });
 
 export const DispatchApprovalSchema = z.object({

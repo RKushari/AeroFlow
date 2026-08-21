@@ -29,6 +29,8 @@ export default async function DispatcherDashboard() {
     unreadAlertsCount = await db.alertLogs.count({ where: { read: false } });
   }
 
+  const activeIncidentsCount = await db.incidents.count({ where: { resolved: false } });
+
   return (
     <div className="flex flex-col gap-6">
       <DispatcherCockpit 
