@@ -2,35 +2,16 @@
 
 export default function Loading() {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#3498db]/77 backdrop-blur-sm">
-      <div className="relative w-[200px] h-[200px] animate-[spin_3s_linear_infinite]">
-        {/* Trail of dots */}
-        {[...Array(21)].map((_, i) => {
-          const index = i + 1;
-          const rotation = (index * -12) - 15;
-          const size = 12 - (index * 0.5);
-          return (
-            <div
-              key={i}
-              className="absolute top-1/2 left-1/2 bg-white rounded-full"
-              style={{
-                width: `${size}px`,
-                height: `${size}px`,
-                transform: `rotate(${rotation}deg) translateY(-90px) translate(-50%, -50%)`,
-                transformOrigin: '0 0',
-              }}
-            />
-          );
-        })}
+    <div className="fixed top-0 inset-x-0 z-50 pointer-events-none">
+      {/* Top Animated Glowing Progress Line */}
+      <div className="h-1 w-full bg-slate-900 overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 animate-[pulse_0.6s_ease-in-out_infinite] w-full origin-left" />
+      </div>
 
-        {/* Airplane Vector Graphic */}
-        <svg
-          className="absolute top-1/2 left-1/2 w-[40px] h-[40px] fill-white"
-          style={{ transform: 'translateY(-90px) translate(-50%, -50%) rotate(90deg)' }}
-          viewBox="0 0 24 24"
-        >
-          <path d="M21,16v-2l-8-5V3.5C13,2.67,12.33,2,11.5,2S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2,1.5V22l3.5-1l3.5,1v-1.5L13,19v-5.5L21,16z" />
-        </svg>
+      {/* Top HUD Floating Spinner Badge */}
+      <div className="absolute top-3 right-6 bg-slate-950/90 border border-cyan-500/50 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-mono font-bold text-cyan-300 shadow-lg shadow-cyan-950/40 flex items-center gap-2">
+        <div className="w-3.5 h-3.5 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+        <span>Loading Feature...</span>
       </div>
     </div>
   );

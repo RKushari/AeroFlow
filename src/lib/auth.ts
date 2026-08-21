@@ -4,6 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { Role } from "@prisma/client";
 import { db } from "./db";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 export const authOptions: AuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || "aeroflow-super-secret-key-production-development-2026",
@@ -16,7 +17,6 @@ export const authOptions: AuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email) return null;
-        // In a real app we check hash. For this MVP, we match email.
         const user = await db.users.findUnique({ where: { email: credentials.email } });
         if (user) {
           return { id: user.id, email: user.email, name: user.name, role: user.role };
@@ -70,10 +70,15 @@ export type Session = {
   };
 };
 
-export async function getSession(): Promise<Session | null> {
-  const session = await getServerSession(authOptions);
-  return session as Session | null;
-}
+export const getSession = cache(async (): Promise<Session | null> => {
+  try {
+    const session = await getServerSession(authOptions);
+    return session as Session | null;
+  } catch (e) {
+    console.warn("getSession error:", e);
+    return null;
+  }
+});
 
 export function getDashboardForRole(role: Role): string {
   switch (role) {
