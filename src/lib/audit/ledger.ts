@@ -20,8 +20,8 @@ export async function logAudit(
       action, 
       resourceId,
       ipAddress,
-      oldState, 
-      newState 
+      oldState: typeof oldState === 'object' && oldState !== null ? JSON.stringify(oldState) : oldState || null, 
+      newState: typeof newState === 'object' && newState !== null ? JSON.stringify(newState) : newState || null 
     } 
   });
 }
