@@ -218,9 +218,14 @@ export async function updateShiftLog(
 }
 
 export async function getUserShiftLogs(userId: string) {
-  return await db.shiftLogs.findMany({
-    where: { userId },
-    orderBy: { startTime: 'desc' },
-    take: 20,
-  });
+  try {
+    return await db.shiftLogs.findMany({
+      where: { userId },
+      orderBy: { startTime: 'desc' },
+      take: 20,
+    });
+  } catch (err) {
+    console.error("Failed to fetch user shift logs from database, returning empty array fallback:", err);
+    return [];
+  }
 }
