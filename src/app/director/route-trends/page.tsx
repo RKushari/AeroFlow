@@ -1,43 +1,49 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { RouteTrendsClient } from "./client-trends";
+import { mockFlights } from "@/lib/mock-data";
+
+export const dynamic = 'force-dynamic';
 
 export default async function RouteTrendsPage() {
-  await requireRole(['OPERATIONS_DIRECTOR']);
+  await requireRole(['OPERATIONS_DIRECTOR', 'FLIGHT_DISPATCHER', 'GROUND_CREW_LEAD']);
 
-  // Fetch flights and group by routeId and month.
-  // In a real prod environment we'd use raw SQL for group by month,
-  // but Prisma makes Date grouping tricky without rawQuery, so for the prototype
-  // we pull recent risk calculations and aggregate manually or use raw.
-  
-  let flights = await db.flights.findMany({
-    where: { risk: { isNot: null } },
-    include: { risk: true }
-  });
+  let flights: any[] = [];
+  let savedFilters: any[] = [];
 
-  if (flights.length === 0) {
-    const { mockFlights } = await import("@/lib/mock-data");
+  try {
+    flights = await db.flights.findMany({
+      where: { risk: { isNot: null } },
+      include: { risk: true }
+    });
+
+    if (flights.length === 0) {
+      flights = mockFlights as any;
+    }
+
+    savedFilters = await db.savedFilters.findMany();
+  } catch (err) {
+    console.error("Route Trends DB Error, falling back to mock flights:", err);
     flights = mockFlights as any;
   }
-
-  const savedFilters = await db.savedFilters.findMany();
 
   // Aggregate by route
   const routesData: Record<string, any[]> = {};
   
   flights.forEach(f => {
     if (!f.risk) return;
-    const date = new Date(f.risk.calculatedAt);
+    const date = new Date(f.risk.calculatedAt || Date.now());
     const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     
-    if (!routesData[f.routeId]) {
-      routesData[f.routeId] = [];
+    const rId = f.routeId || 'UNKNOWN';
+    if (!routesData[rId]) {
+      routesData[rId] = [];
     }
     
-    let monthEntry = routesData[f.routeId].find(d => d.month === month);
+    let monthEntry = routesData[rId].find(d => d.month === month);
     if (!monthEntry) {
       monthEntry = { month, totalRisk: 0, count: 0 };
-      routesData[f.routeId].push(monthEntry);
+      routesData[rId].push(monthEntry);
     }
     
     monthEntry.totalRisk += f.risk.totalScore;
@@ -46,7 +52,6 @@ export default async function RouteTrendsPage() {
 
   // Calculate averages
   const chartData: any[] = [];
-  // For Recharts we want an array where each object is a month, with routes as keys
   const monthsSet = new Set<string>();
   Object.values(routesData).forEach(routeList => {
     routeList.forEach(entry => monthsSet.add(entry.month));
@@ -68,9 +73,9 @@ export default async function RouteTrendsPage() {
   const availableRoutes = Object.keys(routesData);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2">Flight Route Risk Trends</h1>
-      <p className="text-slate-500 mb-8">Monthly average risk trends analyzed by departure route.</p>
+    <div className="p-4 md:p-6 max-w-6xl mx-auto font-mono">
+      <h1 className="text-2xl md:text-3xl font-bold mb-2 text-white">Flight Route Risk Trends</h1>
+      <p className="text-slate-400 text-sm mb-6">Monthly average risk trends analyzed by departure route.</p>
       
       <RouteTrendsClient 
         chartData={chartData} 

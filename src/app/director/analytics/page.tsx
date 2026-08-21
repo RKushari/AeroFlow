@@ -4,31 +4,41 @@ import { AnalyticsWrapper } from "./analytics-wrapper";
 import { mockKpiAnalytics } from "@/lib/mock-data";
 import { normalizeDashboardLayout } from "./layout-utils";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AnalyticsPage() {
-  const session = await requireRole(['OPERATIONS_DIRECTOR']);
+  const session = await requireRole(['OPERATIONS_DIRECTOR', 'FLIGHT_DISPATCHER', 'GROUND_CREW_LEAD']);
 
-  // Fetch KPI data
-  const incidentsRaw = await db.incidents.findMany({ 
-    include: { flight: { include: { risk: true } } } 
-  });
-  
-  const flights = await db.flights.findMany({
-    include: {
-      risk: true,
-      checklists: { include: { items: true } }
-    },
-    take: 100,
-    orderBy: { id: 'desc' }
-  });
+  let incidentsRaw: any[] = [];
+  let flights: any[] = [];
+  let shiftLogs: any[] = [];
+  let preferences: any = null;
 
-  const shiftLogs = await db.shiftLogs.findMany({
-    orderBy: { startTime: 'desc' },
-    take: 100
-  });
+  try {
+    incidentsRaw = await db.incidents.findMany({ 
+      include: { flight: { include: { risk: true } } } 
+    });
+    
+    flights = await db.flights.findMany({
+      include: {
+        risk: true,
+        checklists: { include: { items: true } }
+      },
+      take: 100,
+      orderBy: { id: 'desc' }
+    });
 
-  const preferences = await db.dashboardPreferences.findUnique({
-    where: { userId: session.user.id }
-  });
+    shiftLogs = await db.shiftLogs.findMany({
+      orderBy: { startTime: 'desc' },
+      take: 100
+    });
+
+    preferences = await db.dashboardPreferences.findUnique({
+      where: { userId: session.user.id }
+    });
+  } catch (err) {
+    console.error("Analytics DB Error, falling back to mock analytics:", err);
+  }
 
   // Calculate Incident Stats (grouped by month)
   const incidentMonths: Record<string, any> = {};
@@ -38,7 +48,7 @@ export default async function AnalyticsPage() {
     if (!incidentMonths[month]) {
       incidentMonths[month] = { month, CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
     }
-    incidentMonths[month][i.severity] += 1;
+    incidentMonths[month][i.severity] = (incidentMonths[month][i.severity] || 0) + 1;
   });
   const incidentData = Object.values(incidentMonths).sort((a: any, b: any) => a.month.localeCompare(b.month));
 
@@ -57,8 +67,8 @@ export default async function AnalyticsPage() {
   const checklistData = flights.map(f => {
     let total = 0;
     let complete = 0;
-    f.checklists.forEach(c => {
-      c.items.forEach(item => {
+    (f.checklists || []).forEach((c: any) => {
+      (c.items || []).forEach((item: any) => {
         total++;
         if (item.isComplete) complete++;
       });
@@ -67,8 +77,8 @@ export default async function AnalyticsPage() {
   });
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Executive Safety KPI Analytics</h1>
+    <div className="p-4 md:p-6 font-mono">
+      <h1 className="text-2xl md:text-3xl font-bold mb-6 text-white">Executive Safety KPI Analytics</h1>
       <AnalyticsWrapper 
         userId={session.user.id}
         incidentData={incidentsRaw.length > 0 ? incidentData : mockKpiAnalytics.incidentData}
