@@ -173,11 +173,11 @@ export function Preflight3DChecklist({
   const totalZonesCount = zones.length;
   const progressPercent = Math.round((verifiedZonesCount / totalZonesCount) * 100);
 
-  // Initialize Three.js Scene
+  // Initialize Three.js Scene safely
   useEffect(() => {
     if (!mountRef.current) return;
     const container = mountRef.current;
-    const width = container.clientWidth;
+    const width = container.clientWidth || 800;
     const height = container.clientHeight || 500;
 
     // Scene
@@ -197,7 +197,11 @@ export function Preflight3DChecklist({
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    container.innerHTML = '';
+    
+    // Safely append renderer DOM element without destroying parent node tracking
+    if (container.contains(renderer.domElement)) {
+      container.removeChild(renderer.domElement);
+    }
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -412,6 +416,16 @@ export function Preflight3DChecklist({
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
       cancelAnimationFrame(animationFrameId);
+      
+      // Safely remove renderer dom element if still attached
+      try {
+        if (container && domElement && container.contains(domElement)) {
+          container.removeChild(domElement);
+        }
+      } catch (e) {
+        // Suppress DOM removal errors during React unmounting
+      }
+
       renderer.dispose();
     };
   }, []);
