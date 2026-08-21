@@ -42,10 +42,16 @@ export default async function DispatcherDashboard() {
     unreadAlertsCount = mockAlerts.filter(a => !a.read).length;
   }
 
+  const safeFlights = (flights || []).map(f => ({
+    ...f,
+    incidents: f.incidents || [],
+    checklists: f.checklists || [],
+  }));
+
   return (
     <div className="flex flex-col gap-6">
       <DispatcherCockpit 
-        flights={flights}
+        flights={safeFlights}
         threshold={threshold}
         unreadAlertsCount={unreadAlertsCount}
       />

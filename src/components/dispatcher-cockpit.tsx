@@ -50,18 +50,18 @@ export function DispatcherCockpit({ flights, threshold, unreadAlertsCount }: Dis
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'BLOCKED' | 'READY' | 'DEPARTED'>('ALL');
 
   // Compute stats
-  const totalFlights = flights.length;
-  const blockedFlights = flights.filter(f => {
+  const totalFlights = (flights || []).length;
+  const blockedFlights = (flights || []).filter(f => {
     const isCritical = f.risk && f.risk.totalScore >= threshold;
-    const hasIncidents = f.incidents.length > 0;
+    const hasIncidents = (f.incidents?.length || 0) > 0;
     return isCritical || hasIncidents || f.status === 'HOLD';
   }).length;
-  const readyFlights = flights.filter(f => f.status === 'READY' || (f.risk && f.risk.totalScore < threshold && f.incidents.length === 0 && f.status === 'BOARDING')).length;
-  const criticalRiskCount = flights.filter(f => f.risk && f.risk.totalScore >= threshold).length;
+  const readyFlights = (flights || []).filter(f => f.status === 'READY' || (f.risk && f.risk.totalScore < threshold && (f.incidents?.length || 0) === 0 && f.status === 'BOARDING')).length;
+  const criticalRiskCount = (flights || []).filter(f => f.risk && f.risk.totalScore >= threshold).length;
 
-  const filteredFlights = flights.filter(f => {
+  const filteredFlights = (flights || []).filter(f => {
     const isCritical = f.risk && f.risk.totalScore >= threshold;
-    const hasIncidents = f.incidents.length > 0;
+    const hasIncidents = (f.incidents?.length || 0) > 0;
     const isBlocked = isCritical || hasIncidents || f.status === 'HOLD';
     
     // Status Filter
@@ -224,11 +224,11 @@ export function DispatcherCockpit({ flights, threshold, unreadAlertsCount }: Dis
           {filteredFlights.map((flight) => {
             const riskScore = flight.risk?.totalScore ?? 0.0;
             const isCritical = riskScore >= threshold;
-            const hasIncidents = flight.incidents.length > 0;
+            const hasIncidents = (flight.incidents?.length || 0) > 0;
             const blocked = isCritical || hasIncidents || flight.status === 'HOLD';
 
-            const origin = flight.route?.originId || flight.routeId.split('-')[0] || 'DEP';
-            const destination = flight.route?.destinationId || flight.routeId.split('-')[1] || 'ARR';
+            const origin = flight.route?.originId || flight.routeId?.split('-')[0] || 'DEP';
+            const destination = flight.route?.destinationId || flight.routeId?.split('-')[1] || 'ARR';
 
             return (
               <motion.div
@@ -322,7 +322,7 @@ export function DispatcherCockpit({ flights, threshold, unreadAlertsCount }: Dis
                   {blocked && (
                     <div className="p-2.5 bg-red-100/60 dark:bg-red-950/40 rounded-xl text-[11px] text-red-800 dark:text-red-300 font-medium space-y-1 border border-red-200/60 dark:border-red-900/40">
                       {isCritical && <div className="flex items-center gap-1.5"><AlertTriangle className="w-3 h-3 text-red-600" /> Critical Risk Exceeds Threshold</div>}
-                      {hasIncidents && <div className="flex items-center gap-1.5"><ShieldAlert className="w-3 h-3 text-red-600" /> {flight.incidents.length} Unresolved Incident(s)</div>}
+                      {hasIncidents && <div className="flex items-center gap-1.5"><ShieldAlert className="w-3 h-3 text-red-600" /> {(flight.incidents?.length || 0)} Unresolved Incident(s)</div>}
                       {flight.status === 'HOLD' && <div className="flex items-center gap-1.5"><Clock className="w-3 h-3 text-red-600" /> Operations Hold Active</div>}
                     </div>
                   )}
