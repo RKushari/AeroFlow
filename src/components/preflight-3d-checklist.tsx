@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useTransition } from 'react';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { 
   CheckCircle2, 
   AlertCircle, 
@@ -17,7 +18,8 @@ import {
   Eye, 
   Check, 
   Sparkles,
-  Plane
+  Plane,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { completeChecklistItem } from '@/lib/actions/crew';
@@ -35,7 +37,6 @@ export interface InspectionZone {
   department: 'mechanics' | 'fuel' | 'cargo' | 'avionics';
   icon: 'wrench' | 'fuel' | 'package' | 'plane';
   position: [number, number, number]; // 3D coordinates on airframe
-  screenCoords?: { x: number; y: number }; // 2D projection
   description: string;
   subItems: InspectionSubItem[];
   isVerified: boolean;
@@ -47,7 +48,7 @@ const INITIAL_ZONES: InspectionZone[] = [
     name: 'Nose Radome & Pitot Probes',
     department: 'avionics',
     icon: 'plane',
-    position: [0, 0.4, 4.2],
+    position: [0, 0.3, 3.8],
     description: 'Inspect weather radar radome, pitot-static tube covers removed, and angle-of-attack sensors.',
     isVerified: false,
     subItems: [
@@ -58,10 +59,10 @@ const INITIAL_ZONES: InspectionZone[] = [
   },
   {
     id: 'engines',
-    name: 'CFM56 Turbofan Engines (Port & Stbd)',
+    name: 'CFM56 / GE9x Turbofan Engines',
     department: 'mechanics',
     icon: 'wrench',
-    position: [-2.2, -0.4, 0.5],
+    position: [-2.0, -0.4, 0.4],
     description: 'Inspect engine intake cowlings, titanium fan blades for FOD nicks, and thrust reverser latches.',
     isVerified: false,
     subItems: [
@@ -76,7 +77,7 @@ const INITIAL_ZONES: InspectionZone[] = [
     name: 'Main & Nose Landing Gear Assembly',
     department: 'mechanics',
     icon: 'wrench',
-    position: [0, -1.2, -0.5],
+    position: [0, -1.0, -0.4],
     description: 'Check oleo strut pressure, tire tread wear, brake wear pin indicators, and hydraulic lines.',
     isVerified: false,
     subItems: [
@@ -91,7 +92,7 @@ const INITIAL_ZONES: InspectionZone[] = [
     name: 'Wings & Flight Control Surfaces',
     department: 'mechanics',
     icon: 'wrench',
-    position: [3.2, 0.2, -1.0],
+    position: [3.0, 0.1, -0.8],
     description: 'Inspect leading-edge slats, trailing-edge flaps, ailerons, winglets, and static discharge wicks.',
     isVerified: false,
     subItems: [
@@ -105,7 +106,7 @@ const INITIAL_ZONES: InspectionZone[] = [
     name: 'Refueling Receptacle & Sump Vents',
     department: 'fuel',
     icon: 'fuel',
-    position: [2.5, -0.2, 0.2],
+    position: [2.2, -0.2, 0.2],
     description: 'Verify fueling hose coupling seal, water drainage sumps, and fuel quantity indicator gauges.',
     isVerified: false,
     subItems: [
@@ -119,7 +120,7 @@ const INITIAL_ZONES: InspectionZone[] = [
     name: 'Forward & Aft Cargo Hold Doors',
     department: 'cargo',
     icon: 'package',
-    position: [0.8, -0.3, 1.8],
+    position: [0.7, -0.3, 1.5],
     description: 'Confirm ULD container locks engaged, cargo nets secured, and hold doors locked flush.',
     isVerified: false,
     subItems: [
@@ -133,7 +134,7 @@ const INITIAL_ZONES: InspectionZone[] = [
     name: 'Main Cabin Doors & Emergency Slides',
     department: 'avionics',
     icon: 'plane',
-    position: [-0.9, 0.5, 2.5],
+    position: [-0.8, 0.4, 2.2],
     description: 'Inspect door seal integrity, slide girt bar status, and exterior handle stowage.',
     isVerified: false,
     subItems: [
@@ -142,6 +143,13 @@ const INITIAL_ZONES: InspectionZone[] = [
       { id: 'sub-door-3', task: 'Passenger boarding bridge / airstairs safety interlock disengaged', isComplete: false, department: 'avionics' },
     ]
   }
+];
+
+export const AVAILABLE_MODELS = [
+  { id: 'B787_nologo.glb', label: 'Boeing 787 Dreamliner (amvlab Open-Source 3D)' },
+  { id: 'B737_nologo.glb', label: 'Boeing 737-800 Twin-Jet (amvlab Open-Source 3D)' },
+  { id: 'A350_nologo.glb', label: 'Airbus A350-900 Widebody (amvlab Open-Source 3D)' },
+  { id: 'A380_nologo.glb', label: 'Airbus A380 Superjumbo (amvlab Open-Source 3D)' },
 ];
 
 interface Preflight3DChecklistProps {
@@ -156,24 +164,26 @@ export function Preflight3DChecklist({
   dbChecklistItems = []
 }: Preflight3DChecklistProps) {
   const mountRef = useRef<HTMLDivElement>(null);
+  const [selectedModelFile, setSelectedModelFile] = useState<string>('B787_nologo.glb');
   const [zones, setZones] = useState<InspectionZone[]>(INITIAL_ZONES);
   const [activeZone, setActiveZone] = useState<InspectionZone | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState<'ALL' | 'mechanics' | 'fuel' | 'cargo' | 'avionics'>('ALL');
   const [isPending, startTransition] = useTransition();
+  const [isLoadingModel, setIsLoadingModel] = useState<boolean>(true);
 
-  // Animation / Three.js state refs
+  // Three.js state refs
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const hotspotMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
+  const aircraftGroupRef = useRef<THREE.Group | null>(null);
 
-  // Count progress
   const verifiedZonesCount = zones.filter(z => z.isVerified).length;
   const totalZonesCount = zones.length;
   const progressPercent = Math.round((verifiedZonesCount / totalZonesCount) * 100);
 
-  // Initialize Three.js Scene safely
+  // Initialize Three.js Scene with amvlab GLTFLoader
   useEffect(() => {
     if (!mountRef.current) return;
     const container = mountRef.current;
@@ -198,26 +208,25 @@ export function Preflight3DChecklist({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     
-    // Safely append renderer DOM element without destroying parent node tracking
     if (container.contains(renderer.domElement)) {
       container.removeChild(renderer.domElement);
     }
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Ambient and Directional Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
-    const dirLight1 = new THREE.DirectionalLight(0x38bdf8, 2.5); // Sky blue
+    const dirLight1 = new THREE.DirectionalLight(0x38bdf8, 2.5);
     dirLight1.position.set(10, 15, 10);
     scene.add(dirLight1);
 
-    const dirLight2 = new THREE.DirectionalLight(0x818cf8, 1.8); // Indigo
+    const dirLight2 = new THREE.DirectionalLight(0x818cf8, 1.8);
     dirLight2.position.set(-10, -5, -10);
     scene.add(dirLight2);
 
-    // Glowing Hologram Grid on Ground
+    // Hologram Ground Grid
     const gridHelper = new THREE.GridHelper(20, 20, 0x3b82f6, 0x1e293b);
     gridHelper.position.y = -1.8;
     scene.add(gridHelper);
@@ -225,107 +234,81 @@ export function Preflight3DChecklist({
     // Aircraft Group
     const aircraftGroup = new THREE.Group();
     scene.add(aircraftGroup);
+    aircraftGroupRef.current = aircraftGroup;
 
-    // 1. Fuselage
-    const fuselageGeo = new THREE.CylinderGeometry(0.7, 0.7, 9, 32);
-    const fuselageMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.3,
-      metalness: 0.8,
-      wireframe: false,
-    });
-    const fuselage = new THREE.Mesh(fuselageGeo, fuselageMat);
-    fuselage.rotation.x = Math.PI / 2;
-    aircraftGroup.add(fuselage);
+    // Load amvlab GLTF / GLB model
+    setIsLoadingModel(true);
+    const loader = new GLTFLoader();
+    const modelPath = `/models/${selectedModelFile}`;
 
-    // Nose Cone
-    const noseGeo = new THREE.ConeGeometry(0.7, 2, 32);
-    const noseMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.2, metalness: 0.9 });
-    const nose = new THREE.Mesh(noseGeo, noseMat);
-    nose.rotation.x = -Math.PI / 2;
-    nose.position.z = 5.5;
-    aircraftGroup.add(nose);
+    loader.load(
+      modelPath,
+      (gltf) => {
+        const model = gltf.scene;
 
-    // Cockpit Windows (Glowing cyan)
-    const cockpitGeo = new THREE.BoxGeometry(0.6, 0.3, 0.5);
-    const cockpitMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
-    cockpit.position.set(0, 0.45, 4.4);
-    cockpit.rotation.x = -0.3;
-    aircraftGroup.add(cockpit);
+        // Auto-scale & center model
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scale = 7 / maxDim;
 
-    // 2. Wings (Swept)
-    const wingShape = new THREE.Shape();
-    wingShape.moveTo(0, 0);
-    wingShape.lineTo(4.5, -2.5);
-    wingShape.lineTo(4.3, -3.2);
-    wingShape.lineTo(0, -1.2);
-    wingShape.closePath();
+        model.scale.set(scale, scale, scale);
+        model.position.sub(center.multiplyScalar(scale));
 
-    const extrudeSettings = { depth: 0.08, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.02, bevelThickness: 0.02 };
-    const wingGeo = new THREE.ExtrudeGeometry(wingShape, extrudeSettings);
-    const wingMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.3 });
+        // Apply Biman Bangladesh high-contrast materials
+        model.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
 
-    // Right Wing
-    const rightWing = new THREE.Mesh(wingGeo, wingMat);
-    rightWing.rotation.x = Math.PI / 2;
-    rightWing.position.set(0.6, 0, 0.5);
-    aircraftGroup.add(rightWing);
+            if (mesh.material) {
+              if (Array.isArray(mesh.material)) {
+                mesh.material.forEach(m => {
+                  if ('metalness' in m) (m as THREE.MeshStandardMaterial).metalness = 0.5;
+                  if ('roughness' in m) (m as THREE.MeshStandardMaterial).roughness = 0.3;
+                });
+              } else if ('metalness' in mesh.material) {
+                const mat = mesh.material as THREE.MeshStandardMaterial;
+                mat.metalness = 0.5;
+                mat.roughness = 0.3;
+              }
+            }
+          }
+        });
 
-    // Left Wing
-    const leftWing = new THREE.Mesh(wingGeo, wingMat);
-    leftWing.rotation.x = Math.PI / 2;
-    leftWing.rotation.y = Math.PI;
-    leftWing.position.set(-0.6, 0, 0.5);
-    aircraftGroup.add(leftWing);
+        aircraftGroup.add(model);
+        setIsLoadingModel(false);
+      },
+      undefined,
+      (err) => {
+        console.warn("Failed loading GLTF GLB from amvlab models, using procedural geometry fallback:", err);
+        setIsLoadingModel(false);
 
-    // Winglets
-    const wingletGeo = new THREE.BoxGeometry(0.05, 0.6, 0.4);
-    const wingletMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const rwWinglet = new THREE.Mesh(wingletGeo, wingletMat);
-    rwWinglet.position.set(4.5, 0.3, -2.5);
-    rwWinglet.rotation.z = 0.3;
-    aircraftGroup.add(rwWinglet);
+        // Procedural 3D Airframe Fallback
+        const fuselageGeo = new THREE.CylinderGeometry(0.7, 0.7, 9, 32);
+        const fuselageMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.8 });
+        const fuselage = new THREE.Mesh(fuselageGeo, fuselageMat);
+        fuselage.rotation.x = Math.PI / 2;
+        aircraftGroup.add(fuselage);
 
-    const lwWinglet = new THREE.Mesh(wingletGeo, wingletMat);
-    lwWinglet.position.set(-4.5, 0.3, -2.5);
-    lwWinglet.rotation.z = -0.3;
-    aircraftGroup.add(lwWinglet);
+        const noseGeo = new THREE.ConeGeometry(0.7, 2, 32);
+        const noseMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.2, metalness: 0.9 });
+        const nose = new THREE.Mesh(noseGeo, noseMat);
+        nose.rotation.x = -Math.PI / 2;
+        nose.position.z = 5.5;
+        aircraftGroup.add(nose);
+      }
+    );
 
-    // 3. Jet Engines (Under wings)
-    const engineGeo = new THREE.CylinderGeometry(0.35, 0.3, 1.8, 24);
-    const engineMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.2 });
-
-    const rightEngine = new THREE.Mesh(engineGeo, engineMat);
-    rightEngine.rotation.x = Math.PI / 2;
-    rightEngine.position.set(1.8, -0.4, 0.5);
-    aircraftGroup.add(rightEngine);
-
-    const leftEngine = new THREE.Mesh(engineGeo, engineMat);
-    leftEngine.rotation.x = Math.PI / 2;
-    leftEngine.position.set(-1.8, -0.4, 0.5);
-    aircraftGroup.add(leftEngine);
-
-    // 4. Tail Empennage (Vertical & Horizontal Stabilizers)
-    const vertTailGeo = new THREE.BoxGeometry(0.08, 2.2, 1.8);
-    const vertTailMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, metalness: 0.7, roughness: 0.3 });
-    const vertTail = new THREE.Mesh(vertTailGeo, vertTailMat);
-    vertTail.position.set(0, 1.2, -4.2);
-    vertTail.rotation.x = -0.4;
-    aircraftGroup.add(vertTail);
-
-    const horizTailGeo = new THREE.BoxGeometry(3.2, 0.06, 0.8);
-    const horizTail = new THREE.Mesh(horizTailGeo, wingMat);
-    horizTail.position.set(0, 0.4, -4.6);
-    aircraftGroup.add(horizTail);
-
-    // Create 3D Hotspot Sphere Pins
+    // 3D Hotspot Sphere Pins
     const hotspotMap = new Map<string, THREE.Mesh>();
 
     zones.forEach((zone) => {
       const pinGeo = new THREE.SphereGeometry(0.22, 16, 16);
       const pinMat = new THREE.MeshBasicMaterial({
-        color: zone.isVerified ? 0x10b981 : 0xf59e0b, // Green if verified, Yellow/Amber if pending
+        color: zone.isVerified ? 0x10b981 : 0xf59e0b,
         transparent: true,
         opacity: 0.9
       });
@@ -335,7 +318,7 @@ export function Preflight3DChecklist({
       aircraftGroup.add(pin);
       hotspotMap.set(zone.id, pin);
 
-      // Outer Pulsing Glow Ring
+      // Ring
       const ringGeo = new THREE.RingGeometry(0.28, 0.35, 24);
       const ringMat = new THREE.MeshBasicMaterial({
         color: zone.isVerified ? 0x10b981 : 0xf59e0b,
@@ -351,9 +334,11 @@ export function Preflight3DChecklist({
 
     hotspotMeshesRef.current = hotspotMap;
 
-    // Mouse Interaction / Orbit Dragging
+    // Mouse Interaction / Orbit Dragging & Raycast Clicking
     let isDragging = false;
     let previousMousePosition = { x: 0, y: 0 };
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
 
     const onMouseDown = (e: MouseEvent) => {
       isDragging = true;
@@ -368,7 +353,6 @@ export function Preflight3DChecklist({
       aircraftGroup.rotation.y += deltaX * 0.008;
       aircraftGroup.rotation.x += deltaY * 0.005;
 
-      // Limit pitch
       aircraftGroup.rotation.x = Math.max(-0.6, Math.min(0.6, aircraftGroup.rotation.x));
       previousMousePosition = { x: e.clientX, y: e.clientY };
     };
@@ -388,7 +372,6 @@ export function Preflight3DChecklist({
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
 
-      // Gentle continuous hover floating if not dragging
       if (!isDragging) {
         aircraftGroup.rotation.y += 0.002;
         aircraftGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.08;
@@ -417,20 +400,19 @@ export function Preflight3DChecklist({
       window.removeEventListener('mouseup', onMouseUp);
       cancelAnimationFrame(animationFrameId);
       
-      // Safely remove renderer dom element if still attached
       try {
         if (container && domElement && container.contains(domElement)) {
           container.removeChild(domElement);
         }
       } catch (e) {
-        // Suppress DOM removal errors during React unmounting
+        // Suppress DOM removal errors
       }
 
       renderer.dispose();
     };
-  }, []);
+  }, [selectedModelFile]);
 
-  // Update 3D hotspot colors when zone verification changes (Yellow -> Green)
+  // Update 3D hotspot colors when zone verification changes
   useEffect(() => {
     zones.forEach((zone) => {
       const mesh = hotspotMeshesRef.current.get(zone.id);
@@ -440,7 +422,6 @@ export function Preflight3DChecklist({
     });
   }, [zones]);
 
-  // Handle Completing a Sub-item in the modal
   const handleToggleSubItem = (zoneId: string, subItemId: string) => {
     setZones(prev => prev.map(zone => {
       if (zone.id !== zoneId) return zone;
@@ -473,10 +454,8 @@ export function Preflight3DChecklist({
     }
   };
 
-  // Confirm All Sub-items for a zone (turns Yellow -> Green)
   const handleConfirmZone = (zoneId: string) => {
     startTransition(async () => {
-      // Complete all items in state
       setZones(prev => prev.map(zone => {
         if (zone.id !== zoneId) return zone;
         return {
@@ -486,7 +465,6 @@ export function Preflight3DChecklist({
         };
       }));
 
-      // Trigger server actions for matching DB items if any
       if (dbChecklistItems.length > 0) {
         for (const item of dbChecklistItems) {
           if (!item.isComplete) {
@@ -513,29 +491,45 @@ export function Preflight3DChecklist({
       {/* HUD Header Bar */}
       <div className="absolute top-0 inset-x-0 p-4 bg-slate-950/85 backdrop-blur-md border-b border-slate-800/80 z-20 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-xl shadow-md shadow-blue-900/30">
+          <div className="p-2.5 bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-xl shadow-md shadow-emerald-900/30">
             <Plane className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-extrabold text-sm font-mono text-white tracking-wider">
-                3D PRE-FLIGHT AIRFRAME INSPECTION ENGINE
+                3D AIRFRAME INSPECTION ENGINE (amvlab GLTF/GLB)
               </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 FLIGHT {flightNumber}
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-mono">
-              Boeing 737-800 Twin-Jet Airframe Walkaround Telemetry
+              Official amvlab/aircraft-models glTF Engine · Biman Bangladesh Telemetry
             </p>
           </div>
         </div>
 
-        {/* Department Filters & Fullscreen */}
-        <div className="flex items-center gap-2">
+        {/* Model Selector & Filters */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Aircraft Model Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedModelFile}
+              onChange={(e) => setSelectedModelFile(e.target.value)}
+              className="appearance-none bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold px-3 py-1.5 pr-8 rounded-xl cursor-pointer hover:border-emerald-400 focus:outline-none"
+            >
+              {AVAILABLE_MODELS.map(m => (
+                <option key={m.id} value={m.id} className="bg-slate-900 text-slate-200">
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-emerald-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
           <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 p-1 rounded-xl font-mono text-xs overflow-x-auto">
             {[
-              { id: 'ALL', label: 'All Zones' },
+              { id: 'ALL', label: 'All' },
               { id: 'mechanics', label: 'Mechanics' },
               { id: 'fuel', label: 'Fuel' },
               { id: 'cargo', label: 'Cargo' },
@@ -546,7 +540,7 @@ export function Preflight3DChecklist({
                 onClick={() => setDepartmentFilter(tab.id as any)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   departmentFilter === tab.id
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'bg-emerald-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -565,6 +559,16 @@ export function Preflight3DChecklist({
         </div>
       </div>
 
+      {/* Loading Overlay */}
+      {isLoadingModel && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm font-mono text-xs text-emerald-400">
+          <div className="flex items-center gap-3 bg-slate-900 border border-emerald-500/30 px-5 py-3 rounded-2xl shadow-2xl">
+            <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+            <span>Loading amvlab 3D Aircraft glTF Model ({selectedModelFile})...</span>
+          </div>
+        </div>
+      )}
+
       {/* 3D WebGL Canvas Viewport */}
       <div ref={mountRef} className="w-full h-[520px] bg-slate-950 cursor-grab active:cursor-grabbing" />
 
@@ -573,7 +577,7 @@ export function Preflight3DChecklist({
         <div className="p-3 bg-slate-950/85 backdrop-blur-md border border-slate-800/80 rounded-2xl pointer-events-auto space-y-2">
           <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
             <span className="flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-blue-400" />
+              <Layers className="w-3.5 h-3.5 text-emerald-400" />
               Inspection Hotspots ({verifiedZonesCount}/{totalZonesCount})
             </span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] ${
@@ -585,7 +589,6 @@ export function Preflight3DChecklist({
             </span>
           </div>
 
-          {/* Progress Bar */}
           <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
             <div 
               className={`h-full transition-all duration-500 ${
@@ -595,7 +598,6 @@ export function Preflight3DChecklist({
             />
           </div>
 
-          {/* Hotspots List */}
           <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
             {filteredZones.map(zone => (
               <button
@@ -625,12 +627,12 @@ export function Preflight3DChecklist({
         </div>
       </div>
 
-      {/* Bottom HUD Orbit Instructions */}
+      {/* Bottom HUD Instructions */}
       <div className="absolute bottom-4 left-4 z-20 p-2.5 bg-slate-950/80 backdrop-blur-md border border-slate-800 rounded-xl text-[11px] font-mono text-slate-400 pointer-events-none hidden sm:flex items-center gap-3">
-        <span className="text-blue-400 font-bold flex items-center gap-1">
-          <Eye className="w-3.5 h-3.5" /> 3D Orbit:
+        <span className="text-emerald-400 font-bold flex items-center gap-1">
+          <Eye className="w-3.5 h-3.5" /> amvlab 3D Orbit:
         </span>
-        <span>Left-click + Drag to rotate 3D airframe · Click any hotspot zone to open sub-item audit modal</span>
+        <span>Drag to rotate glTF 3D model · Click any hotspot to launch inspection modal</span>
       </div>
 
       {/* Modal Dialog for Active Inspection Zone */}
@@ -643,7 +645,6 @@ export function Preflight3DChecklist({
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 text-slate-100 font-mono"
             >
-              {/* Modal Header */}
               <div className="flex items-start justify-between border-b border-slate-800 pb-4">
                 <div className="flex items-center gap-3">
                   <div className={`p-2.5 rounded-2xl ${
@@ -660,7 +661,7 @@ export function Preflight3DChecklist({
                       {activeZone.name}
                     </h3>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Department: <strong className="uppercase text-blue-400">{activeZone.department}</strong>
+                      Department: <strong className="uppercase text-emerald-400">{activeZone.department}</strong>
                     </p>
                   </div>
                 </div>
@@ -674,12 +675,10 @@ export function Preflight3DChecklist({
                 </button>
               </div>
 
-              {/* Zone Description */}
               <p className="text-xs text-slate-300 bg-slate-950 p-3 rounded-xl border border-slate-800 leading-relaxed">
                 {activeZone.description}
               </p>
 
-              {/* Sub-Items Checklist */}
               <div className="space-y-2.5">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
                   <span>Mandatory Inspection Points</span>
@@ -710,7 +709,6 @@ export function Preflight3DChecklist({
                 </div>
               </div>
 
-              {/* Modal Footer / Confirm Verification */}
               <div className="flex items-center justify-between pt-3 border-t border-slate-800">
                 <div className="flex items-center gap-1.5 text-xs text-slate-400">
                   <span className={`w-2 h-2 rounded-full ${
