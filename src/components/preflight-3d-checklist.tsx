@@ -17,7 +17,8 @@ import {
   Eye, 
   Check, 
   Sparkles,
-  Plane
+  Plane,
+  MousePointer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { completeChecklistItem } from '@/lib/actions/crew';
@@ -48,7 +49,7 @@ const INITIAL_ZONES: InspectionZone[] = [
     department: 'avionics',
     icon: 'plane',
     position: [0, 0.4, 4.2],
-    description: 'Inspect weather radar radome, pitot-static tube covers removed, and angle-of-attack sensors.',
+    description: 'Inspect Biman Bangladesh weather radar radome, pitot-static tube covers removed, and angle-of-attack sensors.',
     isVerified: false,
     subItems: [
       { id: 'sub-nose-1', task: 'Radome surface free of bird strikes or structural cracks', isComplete: false, department: 'avionics' },
@@ -58,11 +59,11 @@ const INITIAL_ZONES: InspectionZone[] = [
   },
   {
     id: 'engines',
-    name: 'CFM56 Turbofan Engines (Port & Stbd)',
+    name: 'GE90 / CFM Turbofan Engines (Port & Stbd)',
     department: 'mechanics',
     icon: 'wrench',
     position: [-2.2, -0.4, 0.5],
-    description: 'Inspect engine intake cowlings, titanium fan blades for FOD nicks, and thrust reverser latches.',
+    description: 'Inspect Biman Emerald Green engine cowlings, titanium fan blades for FOD nicks, and thrust reverser latches.',
     isVerified: false,
     subItems: [
       { id: 'sub-eng-1', task: 'Fan blades inspected for foreign object damage (FOD) nicks', isComplete: false, department: 'mechanics' },
@@ -92,11 +93,11 @@ const INITIAL_ZONES: InspectionZone[] = [
     department: 'mechanics',
     icon: 'wrench',
     position: [3.2, 0.2, -1.0],
-    description: 'Inspect leading-edge slats, trailing-edge flaps, ailerons, winglets, and static discharge wicks.',
+    description: 'Inspect swept main wings, Biman green-red winglet tips, slats, flaps, ailerons, and static discharge wicks.',
     isVerified: false,
     subItems: [
       { id: 'sub-wing-1', task: 'Leading-edge slats and Krueger flaps free of ice and contamination', isComplete: false, department: 'mechanics' },
-      { id: 'sub-wing-2', task: 'Static discharge wicks intact on wingtips and blended winglets', isComplete: false, department: 'mechanics' },
+      { id: 'sub-wing-2', task: 'Static discharge wicks intact on Biman green-and-red winglet tips', isComplete: false, department: 'mechanics' },
       { id: 'sub-wing-3', task: 'Aileron and flight spoiler actuators free of hydraulic weeping', isComplete: false, department: 'mechanics' },
     ]
   },
@@ -134,7 +135,7 @@ const INITIAL_ZONES: InspectionZone[] = [
     department: 'avionics',
     icon: 'plane',
     position: [-0.9, 0.5, 2.5],
-    description: 'Inspect door seal integrity, slide girt bar status, and exterior handle stowage.',
+    description: 'Inspect door seal integrity, slide girt bar status, and exterior handle stowage on Biman fuselage.',
     isVerified: false,
     subItems: [
       { id: 'sub-door-1', task: 'Main entrance L1/R1 doors exterior handle flush in locked position', isComplete: false, department: 'avionics' },
@@ -152,34 +153,35 @@ interface Preflight3DChecklistProps {
 
 export function Preflight3DChecklist({
   flightId,
-  flightNumber = 'AF-1042',
+  flightNumber = 'BG-1042',
   dbChecklistItems = []
 }: Preflight3DChecklistProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [zones, setZones] = useState<InspectionZone[]>(INITIAL_ZONES);
   const [activeZone, setActiveZone] = useState<InspectionZone | null>(null);
+  const [hoveredZoneName, setHoveredZoneName] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState<'ALL' | 'mechanics' | 'fuel' | 'cargo' | 'avionics'>('ALL');
   const [isPending, startTransition] = useTransition();
-  const [viewAngle, setViewAngle] = useState<'PERSPECTIVE' | 'TOP' | 'FRONT' | 'SIDE'>('PERSPECTIVE');
 
   // Animation / Three.js state refs
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const hotspotMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
+  const clickableObjectsRef = useRef<THREE.Object3D[]>([]);
 
   // Count progress
   const verifiedZonesCount = zones.filter(z => z.isVerified).length;
   const totalZonesCount = zones.length;
   const progressPercent = Math.round((verifiedZonesCount / totalZonesCount) * 100);
 
-  // Initialize Three.js Scene
+  // Initialize Three.js Scene with Biman Bangladesh Airlines Livery
   useEffect(() => {
     if (!mountRef.current) return;
     const container = mountRef.current;
     const width = container.clientWidth;
-    const height = container.clientHeight || 500;
+    const height = container.clientHeight || 520;
 
     // Scene
     const scene = new THREE.Scene();
@@ -189,7 +191,7 @@ export function Preflight3DChecklist({
 
     // Camera
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(6, 4, 7);
+    camera.position.set(6.5, 4.5, 7.5);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
@@ -203,19 +205,19 @@ export function Preflight3DChecklist({
     rendererRef.current = renderer;
 
     // Ambient and Directional Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
     scene.add(ambientLight);
 
-    const dirLight1 = new THREE.DirectionalLight(0x38bdf8, 2.5); // Sky blue
-    dirLight1.position.set(10, 15, 10);
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 2.8); // Bright overhead light
+    dirLight1.position.set(10, 18, 10);
     scene.add(dirLight1);
 
-    const dirLight2 = new THREE.DirectionalLight(0x818cf8, 1.8); // Indigo
+    const dirLight2 = new THREE.DirectionalLight(0x059669, 1.8); // Biman emerald green fill light
     dirLight2.position.set(-10, -5, -10);
     scene.add(dirLight2);
 
     // Glowing Hologram Grid on Ground
-    const gridHelper = new THREE.GridHelper(20, 20, 0x3b82f6, 0x1e293b);
+    const gridHelper = new THREE.GridHelper(22, 22, 0x059669, 0x1e293b);
     gridHelper.position.y = -1.8;
     scene.add(gridHelper);
 
@@ -223,159 +225,405 @@ export function Preflight3DChecklist({
     const aircraftGroup = new THREE.Group();
     scene.add(aircraftGroup);
 
-    // 1. Fuselage
-    const fuselageGeo = new THREE.CylinderGeometry(0.7, 0.7, 9, 32);
+    const clickableList: THREE.Object3D[] = [];
+
+    // ==========================================
+    // BIMAN BANGLADESH AIRLINES WHITE LIVERY MODEL
+    // ==========================================
+
+    // Color Tokens for Biman Bangladesh Airlines
+    const BIMAN_GREEN = 0x006a4e; // Emerald Green
+    const BIMAN_RED = 0xe11d48;   // Biman Sun Red
+    const PEARL_WHITE = 0xffffff; // Pure Biman White Fuselage
+    const WING_SILVER = 0xd1d5db; // Metallic Silver-White Wing
+    const TITANIUM_DARK = 0x1e293b;
+
+    // 1. Pure White Main Fuselage
+    const fuselageGeo = new THREE.CylinderGeometry(0.72, 0.72, 9, 32);
     const fuselageMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.3,
-      metalness: 0.8,
-      wireframe: false,
+      color: PEARL_WHITE,
+      roughness: 0.15,
+      metalness: 0.2,
     });
     const fuselage = new THREE.Mesh(fuselageGeo, fuselageMat);
     fuselage.rotation.x = Math.PI / 2;
+    fuselage.userData = { zoneId: 'cabin_doors' };
     aircraftGroup.add(fuselage);
+    clickableList.push(fuselage);
 
-    // Nose Cone
-    const noseGeo = new THREE.ConeGeometry(0.7, 2, 32);
-    const noseMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.2, metalness: 0.9 });
+    // Biman Bangladesh Green Cheatline Stripe along side of Fuselage
+    const stripeGeo = new THREE.BoxGeometry(0.04, 0.12, 8.5);
+    const stripeMat = new THREE.MeshBasicMaterial({ color: BIMAN_GREEN });
+    
+    const leftStripe = new THREE.Mesh(stripeGeo, stripeMat);
+    leftStripe.position.set(-0.73, 0.1, 0.2);
+    leftStripe.userData = { zoneId: 'cabin_doors' };
+    aircraftGroup.add(leftStripe);
+    clickableList.push(leftStripe);
+
+    const rightStripe = new THREE.Mesh(stripeGeo, stripeMat);
+    rightStripe.position.set(0.73, 0.1, 0.2);
+    rightStripe.userData = { zoneId: 'cabin_doors' };
+    aircraftGroup.add(rightStripe);
+    clickableList.push(rightStripe);
+
+    // 2. White Nose Cone & Cockpit
+    const noseGeo = new THREE.ConeGeometry(0.72, 2, 32);
+    const noseMat = new THREE.MeshStandardMaterial({ color: PEARL_WHITE, roughness: 0.2, metalness: 0.1 });
     const nose = new THREE.Mesh(noseGeo, noseMat);
     nose.rotation.x = -Math.PI / 2;
     nose.position.z = 5.5;
+    nose.userData = { zoneId: 'nose' };
     aircraftGroup.add(nose);
+    clickableList.push(nose);
 
-    // Cockpit Windows (Glowing cyan)
+    // Nose Tip Radome Guard
+    const noseTipGeo = new THREE.SphereGeometry(0.2, 16, 16);
+    const noseTipMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.2 });
+    const noseTip = new THREE.Mesh(noseTipGeo, noseTipMat);
+    noseTip.position.z = 6.4;
+    noseTip.userData = { zoneId: 'nose' };
+    aircraftGroup.add(noseTip);
+    clickableList.push(noseTip);
+
+    // Cockpit Windows (Cyan Glass)
     const cockpitGeo = new THREE.BoxGeometry(0.6, 0.3, 0.5);
     const cockpitMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
     const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
-    cockpit.position.set(0, 0.45, 4.4);
+    cockpit.position.set(0, 0.46, 4.4);
     cockpit.rotation.x = -0.3;
+    cockpit.userData = { zoneId: 'nose' };
     aircraftGroup.add(cockpit);
+    clickableList.push(cockpit);
 
-    // 2. Wings (Swept)
+    // 3. Swept Main Wings (Biman Bangladesh Metallic Silver-White + Green Accents)
     const wingShape = new THREE.Shape();
     wingShape.moveTo(0, 0);
-    wingShape.lineTo(4.5, -2.5);
-    wingShape.lineTo(4.3, -3.2);
+    wingShape.lineTo(4.6, -2.6);
+    wingShape.lineTo(4.4, -3.3);
     wingShape.lineTo(0, -1.2);
     wingShape.closePath();
 
     const extrudeSettings = { depth: 0.08, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.02, bevelThickness: 0.02 };
     const wingGeo = new THREE.ExtrudeGeometry(wingShape, extrudeSettings);
-    const wingMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.3 });
+    const wingMat = new THREE.MeshStandardMaterial({ color: WING_SILVER, metalness: 0.5, roughness: 0.3 });
 
     // Right Wing
     const rightWing = new THREE.Mesh(wingGeo, wingMat);
     rightWing.rotation.x = Math.PI / 2;
     rightWing.position.set(0.6, 0, 0.5);
+    rightWing.userData = { zoneId: 'wings' };
     aircraftGroup.add(rightWing);
+    clickableList.push(rightWing);
 
     // Left Wing
     const leftWing = new THREE.Mesh(wingGeo, wingMat);
     leftWing.rotation.x = Math.PI / 2;
     leftWing.rotation.y = Math.PI;
     leftWing.position.set(-0.6, 0, 0.5);
+    leftWing.userData = { zoneId: 'wings' };
     aircraftGroup.add(leftWing);
+    clickableList.push(leftWing);
 
-    // Winglets
-    const wingletGeo = new THREE.BoxGeometry(0.05, 0.6, 0.4);
-    const wingletMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    // Biman Winglets (Green with Red Sun Tip)
+    const wingletGeo = new THREE.BoxGeometry(0.06, 0.7, 0.45);
+    const wingletMat = new THREE.MeshBasicMaterial({ color: BIMAN_GREEN });
+    const wingletRedMat = new THREE.MeshBasicMaterial({ color: BIMAN_RED });
+
     const rwWinglet = new THREE.Mesh(wingletGeo, wingletMat);
-    rwWinglet.position.set(4.5, 0.3, -2.5);
-    rwWinglet.rotation.z = 0.3;
+    rwWinglet.position.set(4.6, 0.35, -2.6);
+    rwWinglet.rotation.z = 0.35;
+    rwWinglet.userData = { zoneId: 'wings' };
     aircraftGroup.add(rwWinglet);
+    clickableList.push(rwWinglet);
+
+    const rwWingletTip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.2, 0.45), wingletRedMat);
+    rwWingletTip.position.set(4.7, 0.65, -2.6);
+    rwWingletTip.rotation.z = 0.35;
+    rwWingletTip.userData = { zoneId: 'wings' };
+    aircraftGroup.add(rwWingletTip);
+    clickableList.push(rwWingletTip);
 
     const lwWinglet = new THREE.Mesh(wingletGeo, wingletMat);
-    lwWinglet.position.set(-4.5, 0.3, -2.5);
-    lwWinglet.rotation.z = -0.3;
+    lwWinglet.position.set(-4.6, 0.35, -2.6);
+    lwWinglet.rotation.z = -0.35;
+    lwWinglet.userData = { zoneId: 'wings' };
     aircraftGroup.add(lwWinglet);
+    clickableList.push(lwWinglet);
 
-    // 3. Jet Engines (Under wings)
-    const engineGeo = new THREE.CylinderGeometry(0.35, 0.3, 1.8, 24);
-    const engineMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.2 });
+    const lwWingletTip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.2, 0.45), wingletRedMat);
+    lwWingletTip.position.set(-4.7, 0.65, -2.6);
+    lwWingletTip.rotation.z = -0.35;
+    lwWingletTip.userData = { zoneId: 'wings' };
+    aircraftGroup.add(lwWingletTip);
+    clickableList.push(lwWingletTip);
 
+    // 4. Turbofan Engines (Biman Emerald Green Cowlings)
+    const engineGeo = new THREE.CylinderGeometry(0.38, 0.34, 1.9, 24);
+    const engineMat = new THREE.MeshStandardMaterial({ color: BIMAN_GREEN, metalness: 0.5, roughness: 0.3 });
+    const engineRimMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.9, roughness: 0.1 });
+
+    // Right Engine
     const rightEngine = new THREE.Mesh(engineGeo, engineMat);
     rightEngine.rotation.x = Math.PI / 2;
-    rightEngine.position.set(1.8, -0.4, 0.5);
+    rightEngine.position.set(1.9, -0.4, 0.5);
+    rightEngine.userData = { zoneId: 'engines' };
     aircraftGroup.add(rightEngine);
+    clickableList.push(rightEngine);
 
+    const rightEngineRim = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.04, 16, 24), engineRimMat);
+    rightEngineRim.position.set(1.9, -0.4, 1.45);
+    rightEngineRim.userData = { zoneId: 'engines' };
+    aircraftGroup.add(rightEngineRim);
+    clickableList.push(rightEngineRim);
+
+    // Left Engine
     const leftEngine = new THREE.Mesh(engineGeo, engineMat);
     leftEngine.rotation.x = Math.PI / 2;
-    leftEngine.position.set(-1.8, -0.4, 0.5);
+    leftEngine.position.set(-1.9, -0.4, 0.5);
+    leftEngine.userData = { zoneId: 'engines' };
     aircraftGroup.add(leftEngine);
+    clickableList.push(leftEngine);
 
-    // 4. Tail Empennage (Vertical & Horizontal Stabilizers)
-    const vertTailGeo = new THREE.BoxGeometry(0.08, 2.2, 1.8);
-    const vertTailMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, metalness: 0.7, roughness: 0.3 });
+    const leftEngineRim = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.04, 16, 24), engineRimMat);
+    leftEngineRim.position.set(-1.9, -0.4, 1.45);
+    leftEngineRim.userData = { zoneId: 'engines' };
+    aircraftGroup.add(leftEngineRim);
+    clickableList.push(leftEngineRim);
+
+    // 5. Biman Emerald Green Tail & Red Sun Accent
+    const vertTailGeo = new THREE.BoxGeometry(0.08, 2.3, 1.9);
+    const vertTailMat = new THREE.MeshStandardMaterial({ color: BIMAN_GREEN, metalness: 0.4, roughness: 0.3 });
     const vertTail = new THREE.Mesh(vertTailGeo, vertTailMat);
-    vertTail.position.set(0, 1.2, -4.2);
-    vertTail.rotation.x = -0.4;
+    vertTail.position.set(0, 1.3, -4.2);
+    vertTail.rotation.x = -0.42;
+    vertTail.userData = { zoneId: 'cabin_doors' };
     aircraftGroup.add(vertTail);
+    clickableList.push(vertTail);
 
-    const horizTailGeo = new THREE.BoxGeometry(3.2, 0.06, 0.8);
+    // Iconic Biman Red Stork / Sun Emblem Disk on Tail
+    const sunDiscGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.09, 24);
+    const sunDiscMat = new THREE.MeshBasicMaterial({ color: BIMAN_RED });
+    
+    const leftSunDisc = new THREE.Mesh(sunDiscGeo, sunDiscMat);
+    leftSunDisc.rotation.z = Math.PI / 2;
+    leftSunDisc.position.set(-0.04, 1.4, -4.2);
+    leftSunDisc.userData = { zoneId: 'cabin_doors' };
+    aircraftGroup.add(leftSunDisc);
+    clickableList.push(leftSunDisc);
+
+    const rightSunDisc = new THREE.Mesh(sunDiscGeo, sunDiscMat);
+    rightSunDisc.rotation.z = Math.PI / 2;
+    rightSunDisc.position.set(0.04, 1.4, -4.2);
+    rightSunDisc.userData = { zoneId: 'cabin_doors' };
+    aircraftGroup.add(rightSunDisc);
+    clickableList.push(rightSunDisc);
+
+    // Horizontal Stabilizers
+    const horizTailGeo = new THREE.BoxGeometry(3.4, 0.06, 0.85);
     const horizTail = new THREE.Mesh(horizTailGeo, wingMat);
     horizTail.position.set(0, 0.4, -4.6);
+    horizTail.userData = { zoneId: 'wings' };
     aircraftGroup.add(horizTail);
+    clickableList.push(horizTail);
+
+    // 6. Landing Gear Assembly (Struts & Tires)
+    const strutMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.9, roughness: 0.2 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: TITANIUM_DARK, roughness: 0.8 });
+
+    // Nose Gear
+    const noseStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.2), strutMat);
+    noseStrut.position.set(0, -0.9, 3.8);
+    noseStrut.userData = { zoneId: 'landing_gear' };
+    aircraftGroup.add(noseStrut);
+    clickableList.push(noseStrut);
+
+    const noseTire = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.15, 16), tireMat);
+    noseTire.rotation.z = Math.PI / 2;
+    noseTire.position.set(0, -1.4, 3.8);
+    noseTire.userData = { zoneId: 'landing_gear' };
+    aircraftGroup.add(noseTire);
+    clickableList.push(noseTire);
+
+    // Main Gear Left & Right
+    const rGearStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2), strutMat);
+    rGearStrut.position.set(1.2, -0.9, -0.5);
+    rGearStrut.userData = { zoneId: 'landing_gear' };
+    aircraftGroup.add(rGearStrut);
+    clickableList.push(rGearStrut);
+
+    const rGearTire = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.2, 16), tireMat);
+    rGearTire.rotation.z = Math.PI / 2;
+    rGearTire.position.set(1.2, -1.4, -0.5);
+    rGearTire.userData = { zoneId: 'landing_gear' };
+    aircraftGroup.add(rGearTire);
+    clickableList.push(rGearTire);
+
+    const lGearStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2), strutMat);
+    lGearStrut.position.set(-1.2, -0.9, -0.5);
+    lGearStrut.userData = { zoneId: 'landing_gear' };
+    aircraftGroup.add(lGearStrut);
+    clickableList.push(lGearStrut);
+
+    const lGearTire = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.2, 16), tireMat);
+    lGearTire.rotation.z = Math.PI / 2;
+    lGearTire.position.set(-1.2, -1.4, -0.5);
+    lGearTire.userData = { zoneId: 'landing_gear' };
+    aircraftGroup.add(lGearTire);
+    clickableList.push(lGearTire);
+
+    // 7. Refueling Panel & Cargo Door Hatch Details
+    const fuelCapGeo = new THREE.BoxGeometry(0.3, 0.06, 0.3);
+    const fuelCapMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+    const fuelCap = new THREE.Mesh(fuelCapGeo, fuelCapMat);
+    fuelCap.position.set(2.5, -0.15, 0.2);
+    fuelCap.userData = { zoneId: 'fuel_panel' };
+    aircraftGroup.add(fuelCap);
+    clickableList.push(fuelCap);
+
+    const cargoDoorGeo = new THREE.BoxGeometry(0.08, 0.5, 0.9);
+    const cargoDoorMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+    const cargoDoor = new THREE.Mesh(cargoDoorGeo, cargoDoorMat);
+    cargoDoor.position.set(0.7, -0.2, 1.8);
+    cargoDoor.userData = { zoneId: 'cargo_doors' };
+    aircraftGroup.add(cargoDoor);
+    clickableList.push(cargoDoor);
 
     // Create 3D Hotspot Sphere Pins
     const hotspotMap = new Map<string, THREE.Mesh>();
 
     zones.forEach((zone) => {
-      const pinGeo = new THREE.SphereGeometry(0.22, 16, 16);
+      const pinGeo = new THREE.SphereGeometry(0.24, 16, 16);
       const pinMat = new THREE.MeshBasicMaterial({
         color: zone.isVerified ? 0x10b981 : 0xf59e0b, // Green if verified, Yellow/Amber if pending
         transparent: true,
-        opacity: 0.9
+        opacity: 0.95
       });
       const pin = new THREE.Mesh(pinGeo, pinMat);
       pin.position.set(...zone.position);
       pin.userData = { zoneId: zone.id };
       aircraftGroup.add(pin);
       hotspotMap.set(zone.id, pin);
+      clickableList.push(pin);
 
       // Outer Pulsing Glow Ring
-      const ringGeo = new THREE.RingGeometry(0.28, 0.35, 24);
+      const ringGeo = new THREE.RingGeometry(0.3, 0.38, 24);
       const ringMat = new THREE.MeshBasicMaterial({
         color: zone.isVerified ? 0x10b981 : 0xf59e0b,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.6
+        opacity: 0.7
       });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       ring.position.set(...zone.position);
       ring.rotation.x = Math.PI / 2;
+      ring.userData = { zoneId: zone.id };
       aircraftGroup.add(ring);
+      clickableList.push(ring);
     });
 
     hotspotMeshesRef.current = hotspotMap;
+    clickableObjectsRef.current = clickableList;
 
-    // Mouse Interaction / Orbit Dragging
+    // ==========================================
+    // INTERACTIVE RAYCASTING & ORBIT DRAGGING
+    // ==========================================
     let isDragging = false;
+    let dragStartPosition = { x: 0, y: 0 };
     let previousMousePosition = { x: 0, y: 0 };
 
-    const onMouseDown = (e: MouseEvent) => {
-      isDragging = true;
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    const onPointerDown = (e: MouseEvent) => {
+      isDragging = false;
+      dragStartPosition = { x: e.clientX, y: e.clientY };
       previousMousePosition = { x: e.clientX, y: e.clientY };
     };
 
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      const deltaX = e.clientX - previousMousePosition.x;
-      const deltaY = e.clientY - previousMousePosition.y;
+    const onPointerMove = (e: MouseEvent) => {
+      const deltaX = Math.abs(e.clientX - dragStartPosition.x);
+      const deltaY = Math.abs(e.clientY - dragStartPosition.y);
 
-      aircraftGroup.rotation.y += deltaX * 0.008;
-      aircraftGroup.rotation.x += deltaY * 0.005;
+      if (deltaX > 4 || deltaY > 4) {
+        isDragging = true;
+      }
 
-      // Limit pitch
-      aircraftGroup.rotation.x = Math.max(-0.6, Math.min(0.6, aircraftGroup.rotation.x));
+      // Drag Orbit Rotation
+      if (e.buttons === 1) {
+        const moveX = e.clientX - previousMousePosition.x;
+        const moveY = e.clientY - previousMousePosition.y;
+
+        aircraftGroup.rotation.y += moveX * 0.008;
+        aircraftGroup.rotation.x += moveY * 0.005;
+
+        // Limit pitch
+        aircraftGroup.rotation.x = Math.max(-0.6, Math.min(0.6, aircraftGroup.rotation.x));
+      } else {
+        // Hover Raycast for Interactive Cursor & Tooltip
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(clickableObjectsRef.current, true);
+
+        if (intersects.length > 0) {
+          let currObj: THREE.Object3D | null = intersects[0].object;
+          while (currObj && !currObj.userData?.zoneId) {
+            currObj = currObj.parent;
+          }
+          if (currObj && currObj.userData?.zoneId) {
+            container.style.cursor = 'pointer';
+            const hovered = INITIAL_ZONES.find(z => z.id === currObj!.userData.zoneId);
+            setHoveredZoneName(hovered ? hovered.name : null);
+          } else {
+            container.style.cursor = 'grab';
+            setHoveredZoneName(null);
+          }
+        } else {
+          container.style.cursor = 'grab';
+          setHoveredZoneName(null);
+        }
+      }
+
       previousMousePosition = { x: e.clientX, y: e.clientY };
     };
 
-    const onMouseUp = () => { isDragging = false; };
+    const onPointerUp = (e: MouseEvent) => {
+      // Raycast Click Detection (if mouse moved less than 5px)
+      if (!isDragging) {
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(clickableObjectsRef.current, true);
+
+        if (intersects.length > 0) {
+          let currObj: THREE.Object3D | null = intersects[0].object;
+          while (currObj && !currObj.userData?.zoneId) {
+            currObj = currObj.parent;
+          }
+          if (currObj && currObj.userData?.zoneId) {
+            const targetZoneId = currObj.userData.zoneId;
+            setZones(currentZones => {
+              const targetZone = currentZones.find(z => z.id === targetZoneId);
+              if (targetZone) {
+                setActiveZone(targetZone);
+              }
+              return currentZones;
+            });
+          }
+        }
+      }
+      isDragging = false;
+    };
 
     const domElement = renderer.domElement;
-    domElement.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    domElement.addEventListener('mousedown', onPointerDown);
+    domElement.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
 
     // Animation Loop
     let animationFrameId: number;
@@ -385,10 +633,10 @@ export function Preflight3DChecklist({
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
 
-      // Gentle continuous hover floating if not dragging
+      // Gentle continuous hover floating if not user dragging
       if (!isDragging) {
-        aircraftGroup.rotation.y += 0.002;
-        aircraftGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.08;
+        aircraftGroup.rotation.y += 0.0018;
+        aircraftGroup.position.y = Math.sin(elapsedTime * 1.4) * 0.07;
       }
 
       renderer.render(scene, camera);
@@ -399,7 +647,7 @@ export function Preflight3DChecklist({
     const handleResize = () => {
       if (!container || !camera || !renderer) return;
       const w = container.clientWidth;
-      const h = container.clientHeight || 500;
+      const h = container.clientHeight || 520;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
@@ -409,9 +657,9 @@ export function Preflight3DChecklist({
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      domElement.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      domElement.removeEventListener('mousedown', onPointerDown);
+      domElement.removeEventListener('mousemove', onPointerMove);
+      window.removeEventListener('mouseup', onPointerUp);
       cancelAnimationFrame(animationFrameId);
       renderer.dispose();
     };
@@ -500,20 +748,21 @@ export function Preflight3DChecklist({
       {/* HUD Header Bar */}
       <div className="absolute top-0 inset-x-0 p-4 bg-slate-950/85 backdrop-blur-md border-b border-slate-800/80 z-20 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-xl shadow-md shadow-blue-900/30">
+          <div className="p-2.5 bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-xl shadow-md shadow-emerald-900/30 flex items-center gap-1">
             <Plane className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-extrabold text-sm font-mono text-white tracking-wider">
-                3D PRE-FLIGHT AIRFRAME INSPECTION ENGINE
+              <h3 className="font-extrabold text-sm font-mono text-white tracking-wider flex items-center gap-2">
+                BIMAN BANGLADESH AIRLINES — 3D AIRFRAME INSPECTION ENGINE
               </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 FLIGHT {flightNumber}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-mono">
-              Boeing 737-800 Twin-Jet Airframe Walkaround Telemetry
+            <p className="text-[11px] text-slate-400 font-mono flex items-center gap-2 mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+              <span>Biman Bangladesh Airlines White Aircraft Livery · Interactive 3D Raycasting</span>
             </p>
           </div>
         </div>
@@ -533,7 +782,7 @@ export function Preflight3DChecklist({
                 onClick={() => setDepartmentFilter(tab.id as any)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   departmentFilter === tab.id
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'bg-emerald-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -553,14 +802,22 @@ export function Preflight3DChecklist({
       </div>
 
       {/* 3D WebGL Canvas Viewport */}
-      <div ref={mountRef} className="w-full h-[520px] bg-slate-950 cursor-grab active:cursor-grabbing" />
+      <div ref={mountRef} className="w-full h-[540px] bg-slate-950 cursor-grab active:cursor-grabbing relative">
+        {/* Raycast Hover Tooltip Badge */}
+        {hoveredZoneName && (
+          <div className="absolute top-20 left-6 z-30 pointer-events-none bg-emerald-950/90 border border-emerald-500/50 backdrop-blur-md px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-emerald-200 shadow-xl flex items-center gap-2 animate-fadeIn">
+            <MousePointer className="w-4 h-4 text-emerald-400 animate-bounce" />
+            <span>Click to inspect: <strong>{hoveredZoneName}</strong></span>
+          </div>
+        )}
+      </div>
 
       {/* Floating 3D Zone Hotspots Control Overlay */}
       <div className="absolute top-20 right-4 z-20 flex flex-col gap-2 max-w-xs w-full pointer-events-none">
         <div className="p-3 bg-slate-950/85 backdrop-blur-md border border-slate-800/80 rounded-2xl pointer-events-auto space-y-2">
           <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
             <span className="flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-blue-400" />
+              <Layers className="w-3.5 h-3.5 text-emerald-400" />
               Inspection Hotspots ({verifiedZonesCount}/{totalZonesCount})
             </span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] ${
@@ -614,10 +871,10 @@ export function Preflight3DChecklist({
 
       {/* Bottom HUD Orbit Instructions */}
       <div className="absolute bottom-4 left-4 z-20 p-2.5 bg-slate-950/80 backdrop-blur-md border border-slate-800 rounded-xl text-[11px] font-mono text-slate-400 pointer-events-none hidden sm:flex items-center gap-3">
-        <span className="text-blue-400 font-bold flex items-center gap-1">
-          <Eye className="w-3.5 h-3.5" /> 3D Orbit:
+        <span className="text-emerald-400 font-bold flex items-center gap-1">
+          <Eye className="w-3.5 h-3.5" /> Interactive 3D Biman Airframe:
         </span>
-        <span>Left-click + Drag to rotate 3D airframe · Click any hotspot zone to open sub-item audit modal</span>
+        <span>Click ANY part of the plane (Nose, Engines, Wings, Gear, Tail, Doors) to inspect · Drag to orbit</span>
       </div>
 
       {/* Modal Dialog for Active Inspection Zone */}
@@ -647,7 +904,7 @@ export function Preflight3DChecklist({
                       {activeZone.name}
                     </h3>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Department: <strong className="uppercase text-blue-400">{activeZone.department}</strong>
+                      Department: <strong className="uppercase text-emerald-400">{activeZone.department}</strong>
                     </p>
                   </div>
                 </div>
