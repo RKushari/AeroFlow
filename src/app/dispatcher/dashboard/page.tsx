@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { getRiskThreshold } from "@/lib/config";
-import { SSEBanners } from "@/components/alerts/sse-banners";
 import { DispatcherCockpit } from "@/components/dispatcher-cockpit";
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +31,6 @@ export default async function DispatcherDashboard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SSEBanners />
       <DispatcherCockpit 
         flights={flights}
         threshold={threshold}

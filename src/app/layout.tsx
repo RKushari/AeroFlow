@@ -6,7 +6,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import ProfileDropdown from "@/components/profile-dropdown";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-
+import { SSEBanners } from "@/components/alerts/sse-banners";
 import { PageTransition } from '@/components/animations/page-transition';
 
 const inter = Inter({ subsets: ["latin"] });
@@ -43,6 +43,9 @@ export default async function RootLayout({
             <div className="wave -two"></div>
             <div className="wave -three"></div>
           </div>
+
+          {/* Real-Time Priority Broadcast & Safety Alerts for all screens */}
+          <SSEBanners />
 
           <div className="flex flex-col min-h-screen relative z-10">
             <header className="glass-header p-4 sticky top-0 z-50 flex items-center justify-between transition-colors duration-300">
