@@ -3,6 +3,7 @@ import { approveDispatch, overrideDispatch } from "@/lib/actions/flight";
 import { requireRole, getSession } from "@/lib/auth";
 import { getRiskThreshold } from "@/lib/config";
 import { RefreshWeatherButton } from "@/components/refresh-weather-button";
+import { BriefingEditor } from "@/components/briefing-editor";
 
 export const dynamic = 'force-dynamic';
 
@@ -37,16 +38,35 @@ export default async function FlightDetails({ params }: { params: { id: string }
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between border-b pb-4">
+      {/* Header Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h1 className="text-2xl font-bold">Flight {flight.flightNumber}</h1>
-          <p className="text-slate-500">Route: {flight.route.originId} → {flight.route.destinationId}</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Flight {flight.flightNumber}</h1>
+            <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${
+              flight.status === 'READY' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+              flight.status === 'DEPARTED' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' :
+              flight.status === 'CANCELLED' ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' :
+              'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
+            }`}>
+              {flight.status}
+            </span>
+          </div>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+            Route Profile: <strong className="text-slate-700 dark:text-slate-200">{flight.route.originId}</strong> ➔ <strong className="text-slate-700 dark:text-slate-200">{flight.route.destinationId}</strong> (Base Route Risk: {flight.route.baseRisk})
+          </p>
         </div>
-        <div className="flex gap-3 items-start">
+
+        <div className="flex flex-wrap gap-3 items-center">
           <RefreshWeatherButton flightId={flight.id} />
-          <a href={`/api/export?flightId=${flight.id}`} target="_blank" className="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg text-sm font-medium transition-colors">
+          <a 
+            href={`/api/export?flightId=${flight.id}`} 
+            target="_blank" 
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-700"
+          >
             Export Dossier (PDF)
           </a>
+          
           {/* Dispatch Form Server Action */}
           <form action={async () => {
             'use server';
@@ -55,7 +75,9 @@ export default async function FlightDetails({ params }: { params: { id: string }
             <button 
               type="submit" 
               disabled={isCritical}
-              className={`px-4 py-2 rounded-lg text-sm font-bold text-white transition-colors ${isCritical ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors cursor-pointer ${
+                isCritical ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-sm'
+              }`}
             >
               Approve Dispatch
             </button>
@@ -69,7 +91,7 @@ export default async function FlightDetails({ params }: { params: { id: string }
             }}>
               <button 
                 type="submit" 
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
               >
                 Confirm Departure (Sign-off)
               </button>
@@ -82,8 +104,17 @@ export default async function FlightDetails({ params }: { params: { id: string }
               const justification = formData.get('justification') as string;
               await overrideDispatch(flight.id, justification || 'Emergency Override');
             }} className="flex gap-2">
-              <input type="text" name="justification" placeholder="Reason..." required className="px-2 py-1 text-sm border rounded-lg" />
-              <button type="submit" className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold">
+              <input 
+                type="text" 
+                name="justification" 
+                placeholder="Override Justification..." 
+                required 
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl outline-none" 
+              />
+              <button 
+                type="submit" 
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+              >
                 Force Override
               </button>
             </form>
@@ -91,113 +122,89 @@ export default async function FlightDetails({ params }: { params: { id: string }
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risk Visualization Panel */}
-        <section className="p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
-          <h2 className="text-lg font-bold mb-4">Risk Coefficient breakdown</h2>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span>Total Score</span>
-              <span className="font-bold">{flight.risk?.totalScore.toFixed(2) ?? 'N/A'}</span>
+        <section className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">Risk Matrix Analysis</h2>
+              <span className={`px-2 py-0.5 text-xs font-bold rounded-md ${
+                isCritical ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+              }`}>
+                {isCritical ? 'CRITICAL / LOCKED' : 'NOMINAL'}
+              </span>
             </div>
-            <div className="flex justify-between text-slate-500">
-              <span>Fatigue Factor (Fs)</span>
-              <span>{flight.risk?.fatigueFactor.toFixed(2) ?? '0'}</span>
+
+            <div className="space-y-4 text-sm">
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-slate-600 dark:text-slate-400 text-xs">Total Composite Score</span>
+                  <span className="font-bold text-base text-slate-900 dark:text-white">
+                    {flight.risk?.totalScore.toFixed(2) ?? 'N/A'} <span className="text-xs font-normal text-slate-400">/ 10.0</span>
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full ${
+                      (flight.risk?.totalScore ?? 0) >= 7.5 ? 'bg-red-500' :
+                      (flight.risk?.totalScore ?? 0) >= 5.0 ? 'bg-amber-500' :
+                      'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, ((flight.risk?.totalScore ?? 0) / 10) * 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 dark:text-slate-400">Fatigue Factor (Fs) (30%)</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{flight.risk?.fatigueFactor.toFixed(2) ?? '0.00'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 dark:text-slate-400">Weather Factor (Wi) (40%)</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{flight.risk?.weatherFactor.toFixed(2) ?? '0.00'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 dark:text-slate-400">Mechanical Factor (Md) (30%)</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{flight.risk?.mechFactor.toFixed(2) ?? '0.00'}</span>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between text-slate-500">
-              <span>Weather Factor (Wi)</span>
-              <span>{flight.risk?.weatherFactor.toFixed(2) ?? '0'}</span>
-            </div>
-            <div className="flex justify-between text-slate-500">
-              <span>Mechanical Factor (Md)</span>
-              <span>{flight.risk?.mechFactor.toFixed(2) ?? '0'}</span>
-            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+            Automatic gate threshold: Risk score &lt; 5.0 allows dispatch clearance; &ge; 7.5 enforces mandatory dispatch block.
           </div>
         </section>
 
-        {/* AI Briefing Delta Editor */}
-        <section className="p-6 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-bold">Safety Briefing (AI Draft)</h2>
-            <form action={async () => {
-              'use server';
-              const { regenerateBriefing } = await import('@/lib/actions/briefing');
-              await regenerateBriefing(flight.id);
-            }}>
-              <button type="submit" className="text-sm text-blue-600 font-medium hover:underline">
-                Generate Draft
-              </button>
-            </form>
-          </div>
-          
-          {flight.briefings.length > 0 ? (
-            <div className="flex flex-col gap-4">
-              <form action={async (formData: FormData) => {
-                'use server';
-                const finalContent = formData.get('finalContent') as string;
-                if (!finalContent || finalContent.length < 50) return;
-                const { approveBriefing } = await import('@/lib/ai');
-                await approveBriefing({ flightId: flight.id, finalContent });
-                const { revalidatePath } = await import('next/cache');
-                revalidatePath(`/dispatcher/flight/${flight.id}`);
-              }} className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase">Latest Draft Content</label>
-                <textarea 
-                  name="finalContent"
-                  className="w-full h-32 p-3 text-sm bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  defaultValue={flight.briefings[0].draftContent}
-                />
-                <button type="submit" className="self-end px-3 py-1.5 bg-slate-900 text-white rounded text-sm font-medium mt-2">
-                  Commit Briefing
-                </button>
-              </form>
-              
-              {flight.briefings.length > 1 && (
-                <div className="border-t pt-4 mt-2">
-                  <label className="text-xs font-semibold text-slate-500 uppercase mb-2 block">History</label>
-                  <ul className="space-y-2">
-                    {flight.briefings.slice(1).map((b, idx) => (
-                      <li key={b.id} className="flex justify-between items-center text-sm p-2 bg-slate-50 rounded">
-                        <span className="truncate max-w-xs">{b.draftContent.slice(0, 50)}...</span>
-                        <form action={async () => {
-                          'use server';
-                          const { deleteBriefing } = await import('@/lib/actions/briefing');
-                          await deleteBriefing(b.id, flight.id);
-                        }}>
-                          <button type="submit" className="text-red-500 font-medium text-xs hover:underline">
-                            Delete
-                          </button>
-                        </form>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="h-32 flex items-center justify-center text-slate-400 text-sm border-2 border-dashed rounded-lg">
-              No briefing generated yet.
-            </div>
-          )}
-        </section>
+        {/* AI Briefing Delta Editor Component */}
+        <div className="lg:col-span-2">
+          <BriefingEditor 
+            flightId={flight.id}
+            flightNumber={flight.flightNumber}
+            briefings={flight.briefings}
+            riskScore={flight.risk?.totalScore ?? 0.0}
+            weatherSeverity={flight.weather[0]?.severityIndex ?? 0.0}
+          />
+        </div>
       </div>
 
       {/* Flight Safety Timeline */}
-      <section className="p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
-        <h2 className="text-lg font-bold mb-4">Flight Safety Timeline</h2>
+      <section className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+        <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4">Immutable Audit & Safety Timeline</h2>
         {timeline.length === 0 ? (
-          <div className="text-sm text-slate-400 text-center py-4">No events recorded for this flight yet.</div>
+          <div className="text-xs text-slate-400 text-center py-6">No audit records logged for this flight yet.</div>
         ) : (
-          <div className="relative border-l-2 border-slate-200 ml-4 space-y-4">
+          <div className="relative border-l-2 border-slate-200 dark:border-slate-800 ml-4 space-y-4">
             {timeline.map((event) => (
               <div key={event.id} className="relative pl-6">
-                <div className="absolute -left-[9px] top-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white" />
-                <div className="text-xs text-slate-400">{new Date(event.timestamp).toLocaleString()}</div>
-                <div className="mt-1">
-                  <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-bold uppercase mr-2">
+                <div className="absolute -left-[9px] top-1.5 w-4 h-4 bg-blue-500 rounded-full border-2 border-white dark:border-slate-900 shadow-xs" />
+                <div className="text-[11px] text-slate-400 font-mono">{new Date(event.timestamp).toLocaleString()}</div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="inline-block px-2 py-0.5 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-md text-[11px] font-bold tracking-wide uppercase border border-blue-100 dark:border-blue-900">
                     {event.action}
                   </span>
-                  <span className="text-sm text-slate-600">by {event.userId.slice(0, 8)}...</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">by User ID: {event.userId.slice(0, 8)}...</span>
                 </div>
               </div>
             ))}

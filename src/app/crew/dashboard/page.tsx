@@ -109,7 +109,7 @@ export default async function CrewDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {flights.map(flight => {
-            const isAssigned = flight.crewUsers.some(u => u.id === session.user.id);
+            const isAssigned = flight.crewUsers.some((u: any) => u.id === session.user.id);
 
             return (
               <div key={flight.id} className="p-6 border border-slate-800/80 rounded-2xl shadow-xl bg-slate-900/60 backdrop-blur-xl flex flex-col justify-between">
@@ -125,9 +125,9 @@ export default async function CrewDashboard() {
                   
                   <div className="mb-4">
                     <h4 className="font-semibold text-xs font-mono mb-2 text-slate-400 uppercase tracking-wider">Mandatory Pre-Flight Checklists</h4>
-                    {flight.checklists.map(checklist => (
+                    {flight.checklists.map((checklist: any) => (
                       <div key={checklist.id} className="ml-1 mb-4 space-y-2">
-                        {checklist.items.map(item => (
+                        {checklist.items.map((item: any) => (
                           <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-950/70 border border-slate-800 text-xs font-mono">
                             <form action={async () => {
                               'use server';
