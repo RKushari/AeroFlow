@@ -19,7 +19,8 @@ import {
   Check, 
   Sparkles,
   Plane,
-  ChevronDown
+  ChevronDown,
+  MousePointer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { completeChecklistItem } from '@/lib/actions/crew';
@@ -36,7 +37,7 @@ export interface InspectionZone {
   name: string;
   department: 'mechanics' | 'fuel' | 'cargo' | 'avionics';
   icon: 'wrench' | 'fuel' | 'package' | 'plane';
-  position: [number, number, number]; // 3D coordinates on airframe
+  position: [number, number, number];
   description: string;
   subItems: InspectionSubItem[];
   isVerified: boolean;
@@ -167,6 +168,7 @@ export function Preflight3DChecklist({
   const [selectedModelFile, setSelectedModelFile] = useState<string>('B787_nologo.glb');
   const [zones, setZones] = useState<InspectionZone[]>(INITIAL_ZONES);
   const [activeZone, setActiveZone] = useState<InspectionZone | null>(null);
+  const [hoveredZoneName, setHoveredZoneName] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState<'ALL' | 'mechanics' | 'fuel' | 'cargo' | 'avionics'>('ALL');
   const [isPending, startTransition] = useTransition();
@@ -176,14 +178,14 @@ export function Preflight3DChecklist({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const hotspotMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const aircraftGroupRef = useRef<THREE.Group | null>(null);
+  const meshToZoneMapRef = useRef<Map<THREE.Mesh, string>>(new Map());
 
   const verifiedZonesCount = zones.filter(z => z.isVerified).length;
   const totalZonesCount = zones.length;
   const progressPercent = Math.round((verifiedZonesCount / totalZonesCount) * 100);
 
-  // Initialize Three.js Scene with amvlab GLTFLoader
+  // Initialize Three.js Scene with Direct Mesh Component Raycasting (NO SPHERE GLOBES)
   useEffect(() => {
     if (!mountRef.current) return;
     const container = mountRef.current;
@@ -236,6 +238,9 @@ export function Preflight3DChecklist({
     scene.add(aircraftGroup);
     aircraftGroupRef.current = aircraftGroup;
 
+    const meshToZoneMap = new Map<THREE.Mesh, string>();
+    meshToZoneMapRef.current = meshToZoneMap;
+
     // Load amvlab GLTF / GLB model
     setIsLoadingModel(true);
     const loader = new GLTFLoader();
@@ -256,22 +261,47 @@ export function Preflight3DChecklist({
         model.scale.set(scale, scale, scale);
         model.position.sub(center.multiplyScalar(scale));
 
-        // Apply Biman Bangladesh high-contrast materials
+        // Traverse 3D airframe meshes and tag them for direct component clicking
         model.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
             mesh.castShadow = true;
             mesh.receiveShadow = true;
 
+            const worldPos = new THREE.Vector3();
+            mesh.getWorldPosition(worldPos);
+
+            // Determine zone ID based on 3D geometry coordinates and name
+            let zoneId = 'cabin_doors';
+            const nameLower = (mesh.name || '').toLowerCase();
+
+            if (nameLower.includes('nose') || nameLower.includes('radome') || nameLower.includes('cockpit') || worldPos.z > 2.2) {
+              zoneId = 'nose';
+            } else if (nameLower.includes('engine') || nameLower.includes('fan') || nameLower.includes('nacelle') || (Math.abs(worldPos.x) > 1.2 && worldPos.y < 0.2 && Math.abs(worldPos.z) < 1.5)) {
+              zoneId = 'engines';
+            } else if (nameLower.includes('wing') || nameLower.includes('flap') || nameLower.includes('slat') || nameLower.includes('aileron') || Math.abs(worldPos.x) > 2.0) {
+              zoneId = 'wings';
+            } else if (nameLower.includes('gear') || nameLower.includes('wheel') || nameLower.includes('tire') || nameLower.includes('strut') || worldPos.y < -0.4) {
+              zoneId = 'landing_gear';
+            } else if (nameLower.includes('fuel') || nameLower.includes('tank')) {
+              zoneId = 'fuel_panel';
+            } else if (nameLower.includes('cargo') || nameLower.includes('door')) {
+              zoneId = 'cargo_doors';
+            }
+
+            mesh.userData = { zoneId };
+            meshToZoneMap.set(mesh, zoneId);
+
+            // Biman Emerald / Pearl White styling
             if (mesh.material) {
               if (Array.isArray(mesh.material)) {
                 mesh.material.forEach(m => {
-                  if ('metalness' in m) (m as THREE.MeshStandardMaterial).metalness = 0.5;
+                  if ('metalness' in m) (m as THREE.MeshStandardMaterial).metalness = 0.4;
                   if ('roughness' in m) (m as THREE.MeshStandardMaterial).roughness = 0.3;
                 });
               } else if ('metalness' in mesh.material) {
                 const mat = mesh.material as THREE.MeshStandardMaterial;
-                mat.metalness = 0.5;
+                mat.metalness = 0.4;
                 mat.roughness = 0.3;
               }
             }
@@ -286,11 +316,13 @@ export function Preflight3DChecklist({
         console.warn("Failed loading GLTF GLB from amvlab models, using procedural geometry fallback:", err);
         setIsLoadingModel(false);
 
-        // Procedural 3D Airframe Fallback
+        // Procedural 3D Airframe Fallback with tagged component meshes
         const fuselageGeo = new THREE.CylinderGeometry(0.7, 0.7, 9, 32);
         const fuselageMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.8 });
         const fuselage = new THREE.Mesh(fuselageGeo, fuselageMat);
         fuselage.rotation.x = Math.PI / 2;
+        fuselage.userData = { zoneId: 'cabin_doors' };
+        meshToZoneMap.set(fuselage, 'cabin_doors');
         aircraftGroup.add(fuselage);
 
         const noseGeo = new THREE.ConeGeometry(0.7, 2, 32);
@@ -298,66 +330,91 @@ export function Preflight3DChecklist({
         const nose = new THREE.Mesh(noseGeo, noseMat);
         nose.rotation.x = -Math.PI / 2;
         nose.position.z = 5.5;
+        nose.userData = { zoneId: 'nose' };
+        meshToZoneMap.set(nose, 'nose');
         aircraftGroup.add(nose);
       }
     );
 
-    // 3D Hotspot Sphere Pins
-    const hotspotMap = new Map<string, THREE.Mesh>();
-
-    zones.forEach((zone) => {
-      const pinGeo = new THREE.SphereGeometry(0.22, 16, 16);
-      const pinMat = new THREE.MeshBasicMaterial({
-        color: zone.isVerified ? 0x10b981 : 0xf59e0b,
-        transparent: true,
-        opacity: 0.9
-      });
-      const pin = new THREE.Mesh(pinGeo, pinMat);
-      pin.position.set(...zone.position);
-      pin.userData = { zoneId: zone.id };
-      aircraftGroup.add(pin);
-      hotspotMap.set(zone.id, pin);
-
-      // Ring
-      const ringGeo = new THREE.RingGeometry(0.28, 0.35, 24);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: zone.isVerified ? 0x10b981 : 0xf59e0b,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.6
-      });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.position.set(...zone.position);
-      ring.rotation.x = Math.PI / 2;
-      aircraftGroup.add(ring);
-    });
-
-    hotspotMeshesRef.current = hotspotMap;
-
-    // Mouse Interaction / Orbit Dragging & Raycast Clicking
+    // Direct Raycast Mouse Interaction (No Globes)
     let isDragging = false;
+    let dragDistance = 0;
     let previousMousePosition = { x: 0, y: 0 };
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
     const onMouseDown = (e: MouseEvent) => {
       isDragging = true;
+      dragDistance = 0;
       previousMousePosition = { x: e.clientX, y: e.clientY };
     };
 
     const onMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      const deltaX = e.clientX - previousMousePosition.x;
-      const deltaY = e.clientY - previousMousePosition.y;
+      const rect = domElement.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-      aircraftGroup.rotation.y += deltaX * 0.008;
-      aircraftGroup.rotation.x += deltaY * 0.005;
+      if (isDragging) {
+        const deltaX = e.clientX - previousMousePosition.x;
+        const deltaY = e.clientY - previousMousePosition.y;
+        dragDistance += Math.abs(deltaX) + Math.abs(deltaY);
 
-      aircraftGroup.rotation.x = Math.max(-0.6, Math.min(0.6, aircraftGroup.rotation.x));
-      previousMousePosition = { x: e.clientX, y: e.clientY };
+        aircraftGroup.rotation.y += deltaX * 0.008;
+        aircraftGroup.rotation.x += deltaY * 0.005;
+        aircraftGroup.rotation.x = Math.max(-0.6, Math.min(0.6, aircraftGroup.rotation.x));
+        previousMousePosition = { x: e.clientX, y: e.clientY };
+        return;
+      }
+
+      // Raycast hover check for direct 3D component highlights
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(aircraftGroup.children, true);
+
+      if (intersects.length > 0) {
+        const hitMesh = intersects[0].object as THREE.Mesh;
+        const zoneId = hitMesh.userData?.zoneId || meshToZoneMap.get(hitMesh);
+        if (zoneId) {
+          domElement.style.cursor = 'pointer';
+          const zone = INITIAL_ZONES.find(z => z.id === zoneId);
+          if (zone) {
+            setHoveredZoneName(zone.name);
+          }
+          return;
+        }
+      }
+      domElement.style.cursor = 'grab';
+      setHoveredZoneName(null);
     };
 
-    const onMouseUp = () => { isDragging = false; };
+    const onMouseUp = (e: MouseEvent) => {
+      // Direct Mesh Component Click Detection
+      if (dragDistance < 5) {
+        const rect = domElement.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(aircraftGroup.children, true);
+
+        if (intersects.length > 0) {
+          for (const hit of intersects) {
+            const hitMesh = hit.object as THREE.Mesh;
+            const zoneId = hitMesh.userData?.zoneId || meshToZoneMap.get(hitMesh);
+            if (zoneId) {
+              setZones(currentZones => {
+                const targetZone = currentZones.find(z => z.id === zoneId);
+                if (targetZone) {
+                  setActiveZone(targetZone);
+                }
+                return currentZones;
+              });
+              break;
+            }
+          }
+        }
+      }
+      isDragging = false;
+    };
 
     const domElement = renderer.domElement;
     domElement.addEventListener('mousedown', onMouseDown);
@@ -412,12 +469,23 @@ export function Preflight3DChecklist({
     };
   }, [selectedModelFile]);
 
-  // Update 3D hotspot colors when zone verification changes
+  // Highlight 3D Airframe Meshes directly when verified (Green tint on inspected parts)
   useEffect(() => {
-    zones.forEach((zone) => {
-      const mesh = hotspotMeshesRef.current.get(zone.id);
-      if (mesh && mesh.material instanceof THREE.MeshBasicMaterial) {
-        mesh.material.color.setHex(zone.isVerified ? 0x10b981 : 0xf59e0b);
+    if (!aircraftGroupRef.current) return;
+    const group = aircraftGroupRef.current;
+
+    group.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        const zoneId = mesh.userData?.zoneId || meshToZoneMapRef.current.get(mesh);
+        if (zoneId) {
+          const zone = zones.find(z => z.id === zoneId);
+          if (zone && zone.isVerified) {
+            if (mesh.material && 'color' in mesh.material) {
+              (mesh.material as THREE.MeshStandardMaterial).color.setHex(0x10b981); // Emerald Green
+            }
+          }
+        }
       }
     });
   }, [zones]);
@@ -497,14 +565,14 @@ export function Preflight3DChecklist({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-extrabold text-sm font-mono text-white tracking-wider">
-                3D AIRFRAME INSPECTION ENGINE (amvlab GLTF/GLB)
+                3D DIRECT AIRFRAME INSPECTION ENGINE (amvlab GLTF)
               </h3>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 FLIGHT {flightNumber}
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-mono">
-              Official amvlab/aircraft-models glTF Engine · Biman Bangladesh Telemetry
+              Click Any Aircraft Component Directly on 3D Model to Open Inspection Checklist
             </p>
           </div>
         </div>
@@ -564,21 +632,36 @@ export function Preflight3DChecklist({
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm font-mono text-xs text-emerald-400">
           <div className="flex items-center gap-3 bg-slate-900 border border-emerald-500/30 px-5 py-3 rounded-2xl shadow-2xl">
             <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-            <span>Loading amvlab 3D Aircraft glTF Model ({selectedModelFile})...</span>
+            <span>Loading 3D Aircraft glTF Model ({selectedModelFile})...</span>
           </div>
         </div>
       )}
 
+      {/* Real-time Component Hover Badge */}
+      <AnimatePresence>
+        {hoveredZoneName && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute top-20 left-6 z-20 bg-slate-900/90 border border-emerald-500/50 backdrop-blur-md px-4 py-2 rounded-2xl text-xs font-mono text-emerald-300 font-bold shadow-xl flex items-center gap-2 pointer-events-none"
+          >
+            <MousePointer className="w-4 h-4 text-emerald-400 animate-bounce" />
+            <span>Click Component to Inspect: <strong className="text-white">{hoveredZoneName}</strong></span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 3D WebGL Canvas Viewport */}
       <div ref={mountRef} className="w-full h-[520px] bg-slate-950 cursor-grab active:cursor-grabbing" />
 
-      {/* Floating 3D Zone Hotspots Control Overlay */}
+      {/* Floating Zone Inspection List Control Overlay */}
       <div className="absolute top-20 right-4 z-20 flex flex-col gap-2 max-w-xs w-full pointer-events-none">
         <div className="p-3 bg-slate-950/85 backdrop-blur-md border border-slate-800/80 rounded-2xl pointer-events-auto space-y-2">
           <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
             <span className="flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-emerald-400" />
-              Inspection Hotspots ({verifiedZonesCount}/{totalZonesCount})
+              Inspection Zones ({verifiedZonesCount}/{totalZonesCount})
             </span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] ${
               progressPercent === 100 
@@ -612,7 +695,7 @@ export function Preflight3DChecklist({
               >
                 <div className="flex items-center gap-2 truncate">
                   <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                    zone.isVerified ? 'bg-emerald-400 shadow-sm shadow-emerald-400' : 'bg-amber-400 animate-pulse'
+                    zone.isVerified ? 'bg-emerald-400 shadow-sm shadow-emerald-400' : 'bg-amber-400'
                   }`} />
                   <span className="truncate font-semibold">{zone.name}</span>
                 </div>
@@ -630,9 +713,9 @@ export function Preflight3DChecklist({
       {/* Bottom HUD Instructions */}
       <div className="absolute bottom-4 left-4 z-20 p-2.5 bg-slate-950/80 backdrop-blur-md border border-slate-800 rounded-xl text-[11px] font-mono text-slate-400 pointer-events-none hidden sm:flex items-center gap-3">
         <span className="text-emerald-400 font-bold flex items-center gap-1">
-          <Eye className="w-3.5 h-3.5" /> amvlab 3D Orbit:
+          <Eye className="w-3.5 h-3.5" /> Direct Component Selection:
         </span>
-        <span>Drag to rotate glTF 3D model · Click any hotspot to launch inspection modal</span>
+        <span>Click Nose, Engines, Wings, Landing Gear or Fuselage directly on 3D Model to launch inspection checklist</span>
       </div>
 
       {/* Modal Dialog for Active Inspection Zone */}
