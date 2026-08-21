@@ -2,7 +2,6 @@ import { FlightStatus, Severity, MessagePriority } from "@prisma/client";
 
 const randomId = (i: number) => `mock-uuid-${i}`;
 
-// Maintain state globally to persist mutations across Next.js server actions/workers
 const globalAny = global as any;
 
 if (!globalAny.mockFlights) {
@@ -58,7 +57,6 @@ if (!globalAny.mockAlerts) {
 }
 export const mockAlerts: any[] = globalAny.mockAlerts;
 
-// Generate 15 Audit Ledger entries
 export const mockLedger = Array.from({ length: 15 }).map((_, i) => ({
   id: `ledger-${i}`,
   userId: 'mock-user-1',
@@ -70,7 +68,6 @@ export const mockLedger = Array.from({ length: 15 }).map((_, i) => ({
   timestamp: new Date(Date.now() - i * 86400000)
 }));
 
-// Generate 5 Broadcast Messages
 export const mockBroadcasts = Array.from({ length: 5 }).map((_, i) => ({
   id: `broadcast-${i}`,
   authorId: 'mock-director-1',
@@ -80,7 +77,35 @@ export const mockBroadcasts = Array.from({ length: 5 }).map((_, i) => ({
   createdAt: new Date(Date.now() - i * 3600000)
 }));
 
-// Mock KPI Analytics Data
+export const mockIncidents = [
+  {
+    id: 'inc-1',
+    flightId: 'mock-uuid-0',
+    reporterId: 'usr-1',
+    type: 'BAGGAGE_BELT_JAM',
+    description: 'Ground baggage conveyor belt jammed near hold 1.',
+    severity: 'MEDIUM' as any,
+    resolved: false,
+    resolutionNotes: null,
+    createdAt: new Date(Date.now() - 3600000),
+    reporter: { id: 'usr-1', name: 'Ground Lead Sam', email: 'sam@aeroflow.com', role: 'GROUND_CREW_LEAD' },
+    flight: { id: 'mock-uuid-0', flightNumber: 'AF-100', status: 'BOARDING' }
+  },
+  {
+    id: 'inc-2',
+    flightId: 'mock-uuid-1',
+    reporterId: 'usr-2',
+    type: 'HYDRAULIC_LEAK_RAMP',
+    description: 'Minor hydraulic fluid spill detected near main landing gear.',
+    severity: 'HIGH' as any,
+    resolved: true,
+    resolutionNotes: 'Absorbent pad applied and area cleaned. Hydraulic line re-torqued.',
+    createdAt: new Date(Date.now() - 7200000),
+    reporter: { id: 'usr-2', name: 'Alex Vance', email: 'alex@aeroflow.com', role: 'FLIGHT_DISPATCHER' },
+    flight: { id: 'mock-uuid-1', flightNumber: 'AF-101', status: 'READY' }
+  }
+];
+
 export const mockKpiAnalytics = {
   incidentData: [
     { month: '2026-01', CRITICAL: 1, HIGH: 2, MEDIUM: 5, LOW: 10 },
@@ -93,14 +118,12 @@ export const mockKpiAnalytics = {
   checklistData: mockFlights.slice(0, 10).map((f: any) => ({ name: f.flightNumber, rate: f.checklists[0].isComplete ? 100 : 50 }))
 };
 
-// Mock Risk Map Coordinates
 export const mockRiskMap = Array.from({ length: 5 }).map((_, i) => ({
   id: `flag-${i}`,
   coordinates: ['JFK', 'LAX', 'ORD', 'MIA', 'SEA'][i],
   reason: ['Thunderstorm Cell', 'Volcanic Ash', 'High Traffic Density', 'Military Airspace', 'Severe Turbulence'][i % 5]
 }));
 
-// Mock Route Trends
 export const mockRouteTrends = [
   { origin: 'JFK', dest: 'LHR', frequency: 145, avgRisk: 3.2 },
   { origin: 'LAX', dest: 'HND', frequency: 120, avgRisk: 4.1 },
