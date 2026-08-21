@@ -27,6 +27,7 @@ export default async function DirectorLayout({
         chartData={masterData.chartData}
         availableRoutes={masterData.availableRoutes}
         savedFilters={masterData.savedFilters}
+        liveRouteHealth={masterData.liveRouteHealth}
       />
     </div>
   );

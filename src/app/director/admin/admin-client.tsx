@@ -314,7 +314,7 @@ export default function AdminClient({
 
                   return (
                     <tr key={log.id} className="hover:bg-white/5 transition-colors">
-                      <td className="px-6 py-4 text-xs whitespace-nowrap text-white/50">
+                      <td className="px-6 py-4 text-xs whitespace-nowrap text-white/50" suppressHydrationWarning>
                         {new Date(log.timestamp).toLocaleString()}
                       </td>
                       <td className="px-6 py-4">

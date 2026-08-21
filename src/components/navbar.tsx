@@ -24,9 +24,6 @@ export function TopNav({ session }: TopNavProps) {
   };
 
   const navItems = [
-    { href: '/dispatcher/dashboard', label: 'Dispatch Cockpit', icon: LayoutDashboard, color: 'hover:text-blue-400', activeBg: 'bg-blue-600/20 text-blue-400 border-blue-500/40' },
-    { href: '/crew/dashboard', label: 'Ground Crew', icon: Users, color: 'hover:text-amber-400', activeBg: 'bg-amber-600/20 text-amber-400 border-amber-500/40' },
-    { href: '/director/ledger', label: 'Director Console', icon: Shield, color: 'hover:text-emerald-400', activeBg: 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40' },
     { href: '/incidents', label: 'Hazard Reporter', icon: AlertTriangle, isHazard: true },
   ];
 
@@ -43,49 +40,54 @@ export function TopNav({ session }: TopNavProps) {
           <span>AeroFlow</span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-2 text-xs font-mono font-bold">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href.split('/')[1] ? `/${item.href.split('/')[1]}` : item.href));
+        {pathname !== '/' && (
+          <nav className="hidden md:flex items-center gap-2 text-xs font-mono font-bold">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href.split('/')[1] ? `/${item.href.split('/')[1]}` : item.href));
 
-            if (item.isHazard) {
+              if (item.isHazard) {
+                const showHazard = pathname.startsWith('/crew') || pathname.startsWith('/dispatcher');
+                if (!showHazard) return null;
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    prefetch={true}
+                    onMouseEnter={() => handleWarmup(item.href)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all ${
+                      isActive
+                        ? 'bg-red-600 text-white border-red-500 shadow-md shadow-red-950'
+                        : 'text-red-400 hover:text-red-300 bg-red-950/40 border-red-800/50 hover:bg-red-900/40'
+                    }`}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              }
+
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   prefetch={true}
                   onMouseEnter={() => handleWarmup(item.href)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
                     isActive
-                      ? 'bg-red-600 text-white border-red-500 shadow-md shadow-red-950'
-                      : 'text-red-400 hover:text-red-300 bg-red-950/40 border-red-800/50 hover:bg-red-900/40'
+                      ? item.activeBg
+                      : 'text-slate-300 border-transparent hover:bg-slate-900/80 ' + item.color
                   }`}
                 >
-                  <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
                   <Icon className="w-3.5 h-3.5" />
                   <span>{item.label}</span>
                 </Link>
               );
-            }
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                prefetch={true}
-                onMouseEnter={() => handleWarmup(item.href)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
-                  isActive
-                    ? item.activeBg
-                    : 'text-slate-300 border-transparent hover:bg-slate-900/80 ' + item.color
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+            })}
+          </nav>
+        )}
       </div>
 
       <div className="flex items-center gap-3">

@@ -52,71 +52,94 @@ export function RiskMapClient({ airports, initialFlagged }: { airports: any[], i
   };
 
   useEffect(() => {
-    if (map.current || !mapContainer.current) return;
+    if (!mapContainer.current) return;
 
-    map.current = new maplibregl.Map({
-      container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          'satellite': {
-            type: 'raster',
-            tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-            tileSize: 256,
-            attribution: 'Tiles &copy; Esri'
+    let initialized = false;
+
+    const initMap = () => {
+      if (initialized || !mapContainer.current) return;
+      if (mapContainer.current.clientWidth === 0 || mapContainer.current.clientHeight === 0) return;
+
+      initialized = true;
+      map.current = new maplibregl.Map({
+        container: mapContainer.current,
+        style: {
+          version: 8,
+          sources: {
+            'satellite': {
+              type: 'raster',
+              tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+              tileSize: 256,
+              attribution: 'Tiles &copy; Esri'
+            },
+            'terrarium': {
+              type: 'raster-dem',
+              tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              encoding: 'terrarium'
+            }
           },
-          'terrarium': {
-            type: 'raster-dem',
-            tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            encoding: 'terrarium'
+          layers: [
+            { id: 'satellite-layer', type: 'raster', source: 'satellite' }
+          ],
+          terrain: {
+            source: 'terrarium',
+            exaggeration: 1.5
           }
         },
-        layers: [
-          { id: 'satellite-layer', type: 'raster', source: 'satellite' }
-        ],
-        terrain: {
-          source: 'terrarium',
-          exaggeration: 1.5
-        }
-      },
-      center: [airports[0]?.lng || -73.7781, airports[0]?.lat || 40.6413],
-      zoom: 13,
-      pitch: 70,
-      bearing: 0
-    });
-
-    map.current.on('load', () => {
-      startAerialRotation();
-
-      // Add markers for monitored airports
-      airports.forEach(airport => {
-        const el = document.createElement('div');
-        const color = airport.risk >= 7.5 ? 'bg-red-500' : airport.risk >= 5.0 ? 'bg-amber-500' : 'bg-emerald-500';
-        
-        el.className = `w-6 h-6 rounded-full border-2 border-white shadow-lg cursor-pointer animate-pulse ${color}`;
-        el.title = airport.code;
-
-        el.addEventListener('click', () => {
-          setSelectedAirport(airport);
-          flyToLocation(airport.lng, airport.lat);
-        });
-
-        new maplibregl.Marker({ element: el })
-          .setLngLat([airport.lng, airport.lat])
-          .addTo(map.current!);
+        center: [airports[0]?.lng || -73.7781, airports[0]?.lat || 40.6413],
+        zoom: 13,
+        pitch: 70,
+        bearing: 0
       });
-    });
 
-    map.current.on('mousedown', () => {
-      if (rotationAnimationId.current) {
-        cancelAnimationFrame(rotationAnimationId.current);
+      map.current.on('load', () => {
+        startAerialRotation();
+
+        // Add markers for monitored airports
+        airports.forEach(airport => {
+          const el = document.createElement('div');
+          const color = airport.risk >= 7.5 ? 'bg-red-500' : airport.risk >= 5.0 ? 'bg-amber-500' : 'bg-emerald-500';
+          
+          el.className = `w-6 h-6 rounded-full border-2 border-white shadow-lg cursor-pointer animate-pulse ${color}`;
+          el.title = airport.code;
+
+          el.addEventListener('click', () => {
+            setSelectedAirport(airport);
+            flyToLocation(airport.lng, airport.lat);
+          });
+
+          new maplibregl.Marker({ element: el })
+            .setLngLat([airport.lng, airport.lat])
+            .addTo(map.current!);
+        });
+      });
+
+      map.current.on('mousedown', () => {
+        if (rotationAnimationId.current) {
+          cancelAnimationFrame(rotationAnimationId.current);
+        }
+      });
+    };
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (!initialized) {
+        initMap();
+      } else if (map.current) {
+        map.current.resize();
       }
     });
+    
+    resizeObserver.observe(mapContainer.current);
+    initMap(); // Attempt immediate initialization
 
     return () => {
       if (rotationAnimationId.current) cancelAnimationFrame(rotationAnimationId.current);
-      map.current?.remove();
+      resizeObserver.disconnect();
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
     };
   }, [airports]);
 

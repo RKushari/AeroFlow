@@ -146,50 +146,22 @@ export function LiveFlights() {
     setLoading(true);
     setError(null);
     try {
-      // Workaround: Fetch directly from client to bypass Vercel datacenter IP bans
-      // Using North America bounding box
-      const openSkyUrl = `https://opensky-network.org/api/states/all?lamin=24.396308&lomin=-125.0&lamax=49.384358&lomax=-66.93457`;
-      const res = await fetch(openSkyUrl);
+      // Fetch through our Next.js API route which handles authentication and caching
+      const res = await fetch('/api/opensky/live');
       
       if (!res.ok) {
         throw new Error(`Status ${res.status}`);
       }
       
-      const rawData = await res.json();
-      if (!rawData.states || rawData.states.length === 0) throw new Error("No live telemetry");
+      const payload = await res.json();
+      if (!payload.data || payload.data.length === 0) throw new Error("No live telemetry");
       
-      const airports = Object.entries(AIRPORT_COORDS);
+      if (payload.source === 'mock') {
+        setError('OpenSky API Limit Reached: Mock simulations.');
+      }
       
-      // Parse and enrich data
-      const enrichedData = rawData.states.map((v: any[], i: number) => {
-        const origIdx = i % airports.length;
-        const destIdx = (i + 4) % airports.length;
-        
-        return {
-          icao24: v[0],
-          callsign: v[1] ? String(v[1]).trim() : null,
-          originCountry: v[2],
-          timePosition: v[3],
-          lastContact: v[4],
-          longitude: v[5],
-          latitude: v[6],
-          baroAltitude: v[7],
-          onGround: v[8],
-          velocity: v[9],
-          trueTrack: v[10],
-          verticalRate: v[11],
-          sensors: v[12],
-          geoAltitude: v[13],
-          squawk: v[14],
-          spi: v[15],
-          positionSource: v[16],
-          category: v[17],
-          originAirport: airports[origIdx][0],
-          destinationAirport: airports[destIdx][0],
-          originCoords: airports[origIdx][1],
-          destinationCoords: airports[destIdx][1],
-        };
-      });
+      // The API already parses and enriches the data
+      const enrichedData = payload.data;
 
       setFlights(enrichedData);
       deadReckoningRef.current.updateStates(enrichedData);

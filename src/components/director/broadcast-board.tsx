@@ -474,7 +474,7 @@ export function BroadcastBoard({ initialMessages }: BroadcastBoardProps) {
                         {/* Delivery Timestamp */}
                         <div className="flex items-center gap-2 text-[11px] text-slate-400">
                           <Clock className="w-3 h-3" />
-                          <span>Published: {new Date(msg.createdAt).toLocaleString()}</span>
+                          <span suppressHydrationWarning>Published: {new Date(msg.createdAt).toLocaleString()}</span>
                           {msg.expiresAt && !expired && (
                             <span className="text-amber-600 dark:text-amber-400 font-medium">
                               · Expires in {Math.max(1, Math.round((new Date(msg.expiresAt).getTime() - Date.now()) / (3600 * 1000)))}h

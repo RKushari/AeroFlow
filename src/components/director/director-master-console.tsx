@@ -40,6 +40,7 @@ interface DirectorMasterConsoleProps {
   chartData: any[];
   availableRoutes: any[];
   savedFilters: any[];
+  liveRouteHealth?: any[];
 }
 
 const TABS = [
@@ -64,7 +65,8 @@ export function DirectorMasterConsole({
   flagged,
   chartData,
   availableRoutes,
-  savedFilters
+  savedFilters,
+  liveRouteHealth = []
 }: DirectorMasterConsoleProps) {
   const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<DirectorTabId>(() => {
@@ -192,6 +194,7 @@ export function DirectorMasterConsole({
               chartData={chartData}
               availableRoutes={availableRoutes}
               savedFilters={savedFilters}
+              liveRouteHealth={liveRouteHealth}
             />
           </div>
         </div>

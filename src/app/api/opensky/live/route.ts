@@ -115,6 +115,8 @@ function generateMockData() {
   });
 }
 
+export const runtime = 'edge';
+
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
@@ -141,12 +143,12 @@ export async function GET(req: NextRequest) {
     const openSkyUrl = `https://opensky-network.org/api/states/all?${openSkyParams}`;
 
     // Build auth headers if credentials are available
-    const headers: Record<string, string> = {};
-    const clientId = process.env.OPENSKY_CLIENT_ID;
-    const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
-    if (clientId && clientSecret) {
+    let headers: Record<string, string> = {};
+    const primaryClientId = process.env.OPENSKY_CLIENT_ID;
+    const primaryClientSecret = process.env.OPENSKY_CLIENT_SECRET;
+    if (primaryClientId && primaryClientSecret) {
       // Use standard btoa instead of Buffer to ensure compatibility across all Vercel runtimes
-      headers['Authorization'] = `Basic ${btoa(`${clientId}:${clientSecret}`)}`;
+      headers['Authorization'] = `Basic ${btoa(`${primaryClientId}:${primaryClientSecret}`)}`;
     }
 
     // ============================================================
@@ -159,11 +161,29 @@ export async function GET(req: NextRequest) {
     // This means OpenSky is hit AT MOST once every 45 seconds
     // globally across ALL users, instead of once per request.
     // ============================================================
-    const upstreamRes = await fetch(openSkyUrl, {
+    
+    let upstreamRes = await fetch(openSkyUrl, {
       headers,
       next: { revalidate: 45 },
-      signal: AbortSignal.timeout(12000), // 12s hard timeout
+      signal: AbortSignal.timeout(8000), // 8s hard timeout to prevent Vercel 10s limits
     });
+
+    // Backup API Credentials
+    if (!upstreamRes.ok && (upstreamRes.status === 429 || upstreamRes.status === 401 || upstreamRes.status === 403)) {
+      console.warn(`[OPENSKY] Primary API failed with status ${upstreamRes.status}. Retrying with backup credentials...`);
+      const backupClientId = process.env.OPENSKY_BACKUP_CLIENT_ID;
+      const backupClientSecret = process.env.OPENSKY_BACKUP_CLIENT_SECRET;
+      
+      if (backupClientId && backupClientSecret) {
+        headers['Authorization'] = `Basic ${btoa(`${backupClientId}:${backupClientSecret}`)}`;
+        
+        upstreamRes = await fetch(openSkyUrl, {
+          headers,
+          next: { revalidate: 45 },
+          signal: AbortSignal.timeout(8000),
+        });
+      }
+    }
 
     if (!upstreamRes.ok) {
       const errorText = await upstreamRes.text().catch(() => 'No body');
@@ -171,7 +191,7 @@ export async function GET(req: NextRequest) {
       console.error(`[OPENSKY_ERROR] Headers:`, Object.fromEntries(upstreamRes.headers.entries()));
       console.error(`[OPENSKY_ERROR] Body: ${errorText}`);
       if (upstreamRes.status === 429) {
-        throw new Error('429 Rate Limit');
+        throw new Error('429 Rate Limit on Backup API');
       }
       throw new Error(`OpenSky returned ${upstreamRes.status}: ${errorText}`);
     }
