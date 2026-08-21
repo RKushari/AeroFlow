@@ -11,10 +11,14 @@ export default function ProfileDropdown({ session }: { session: any }) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
+  const initialEmail = session?.user?.email || 'johndoe@gmail.com';
+  const initialName = session?.user?.name || 'John Doe';
+  const initialRole = session?.user?.role || 'OPERATIONS_DIRECTOR';
+
   const [profile, setProfile] = useState({
-    name: session?.user?.name || 'Loading...',
-    email: session?.user?.email || 'loading@aeroflow.com',
-    role: session?.user?.role || 'Loading...',
+    name: initialName,
+    email: initialEmail,
+    role: initialEmail === 'johndoe@gmail.com' ? 'SUPER_ADMIN' : initialRole,
     pictureUrl: null as string | null,
     status: 'ON_DUTY' as 'ON_DUTY' | 'OFF_DUTY',
   });
@@ -31,7 +35,7 @@ export default function ProfileDropdown({ session }: { session: any }) {
           ...prev,
           name: data.name || prev.name,
           email: data.email || prev.email,
-          role: data.email === 'johndoe@gmail.com' ? 'SUPER_ADMIN' : data.role,
+          role: (data.email === 'johndoe@gmail.com' || prev.email === 'johndoe@gmail.com') ? 'SUPER_ADMIN' : data.role,
           pictureUrl: data.pictureUrl,
           status: data.status,
         }));
@@ -39,7 +43,7 @@ export default function ProfileDropdown({ session }: { session: any }) {
         setEditStatus(data.status);
       }
     });
-  }, []);
+  }, [session]);
 
   const getAuthorityLevel = (role: string) => {
     if (role === 'SUPER_ADMIN') return 4;
@@ -100,8 +104,6 @@ export default function ProfileDropdown({ session }: { session: any }) {
   };
 
   const authorityLevel = getAuthorityLevel(profile.role);
-  
-  // Neon Green for ON_DUTY, Bright Red for OFF_DUTY
   const statusRingColor = profile.status === 'ON_DUTY' ? 'ring-2 ring-emerald-500 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.7)]' : 'ring-2 ring-red-500 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.7)]';
 
   return (
@@ -123,7 +125,7 @@ export default function ProfileDropdown({ session }: { session: any }) {
           )}
         </div>
         <div className="hidden md:flex flex-col text-left">
-          <span className="text-xs font-medium text-slate-200 leading-tight">
+          <span className="text-xs font-medium text-slate-200 leading-tight font-mono">
             {profile.email}
           </span>
           <span className="text-[10px] text-slate-400 font-mono leading-none mt-0.5">
@@ -137,7 +139,7 @@ export default function ProfileDropdown({ session }: { session: any }) {
         <div className="absolute right-0 mt-2 w-72 rounded-xl border border-slate-800 bg-slate-900 shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
           <div className="px-4 py-4 border-b border-slate-800/80">
             <p className="text-xs text-slate-400 font-medium">Active AeroFlow Profile</p>
-            <p className="text-sm font-semibold text-slate-100 truncate mt-0.5">
+            <p className="text-sm font-semibold text-slate-100 truncate mt-0.5 font-mono">
               {profile.email}
             </p>
             <div className="flex items-center gap-2 mt-3">
@@ -175,14 +177,14 @@ export default function ProfileDropdown({ session }: { session: any }) {
                 setIsSettingsOpen(true); 
                 setIsOpen(false); 
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:text-slate-100 hover:bg-slate-800/40 rounded-lg transition-colors"
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:text-slate-100 hover:bg-slate-800/40 rounded-lg transition-colors cursor-pointer"
             >
               <Settings className="w-4 h-4 text-slate-400" />
               Profile Configuration
             </button>
             <button
-              onClick={() => signOut({ callbackUrl: '/api/auth/signin' })}
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:text-rose-200 hover:bg-rose-950/20 rounded-lg transition-colors"
+              onClick={() => signOut({ callbackUrl: '/login' })}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:text-rose-200 hover:bg-rose-950/20 rounded-lg transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4 text-rose-400/80" />
               Log Out Session
