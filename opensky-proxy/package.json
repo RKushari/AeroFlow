@@ -1,0 +1,17 @@
+{
+  "name": "opensky-proxy",
+  "version": "1.0.0",
+  "description": "A micro-proxy for OpenSky API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "lru-cache": "^10.2.0"
+  }
+}
