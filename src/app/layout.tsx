@@ -14,6 +14,8 @@ export const metadata: Metadata = {
   description: "Production-grade aviation safety and risk intelligence platform.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
