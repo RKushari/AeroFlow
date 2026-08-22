@@ -12,6 +12,9 @@ export default async function DispatcherDashboard() {
   await requireRole(['FLIGHT_DISPATCHER', 'OPERATIONS_DIRECTOR']);
 
   let flights = await db.flights.findMany({
+    where: {
+      status: { in: ['SCHEDULED', 'BOARDING', 'HOLD'] },
+    },
     include: {
       route: true,
       risk: true,

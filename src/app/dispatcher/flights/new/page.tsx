@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { createFlightPlan } from "@/lib/actions/flight-creation";
-import { ArrowLeft, Loader2, Plane, Calendar, ShieldCheck, HelpCircle } from "lucide-react";
+import { createFlightPlan, lookupAirport, type AirportLookupResult } from "@/lib/actions/flight-creation";
+import { ArrowLeft, Loader2, Plane, Calendar, ShieldCheck, HelpCircle, MapPin, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 export default function NewFlightPlan() {
@@ -19,15 +19,48 @@ export default function NewFlightPlan() {
     departureTime: "",
   });
 
+  const [originInfo, setOriginInfo] = useState<AirportLookupResult | null>(null);
+  const [originUnknown, setOriginUnknown] = useState(false);
+  const [destinationInfo, setDestinationInfo] = useState<AirportLookupResult | null>(null);
+  const [destinationUnknown, setDestinationUnknown] = useState(false);
+  const [lookingUp, setLookingUp] = useState<"origin" | "destination" | null>(null);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value.toUpperCase() });
+    const { name, value } = e.target;
+    const upper = value.toUpperCase();
+    setForm({ ...form, [name]: upper });
+
+    if (name === "originIata") {
+      setOriginInfo(null);
+      setOriginUnknown(false);
+      if (upper.length === 3) {
+        setLookingUp("origin");
+        lookupAirport(upper).then((result) => {
+          setOriginInfo(result);
+          setOriginUnknown(!result);
+          setLookingUp(null);
+        });
+      }
+    }
+
+    if (name === "destinationIata") {
+      setDestinationInfo(null);
+      setDestinationUnknown(false);
+      if (upper.length === 3) {
+        setLookingUp("destination");
+        lookupAirport(upper).then((result) => {
+          setDestinationInfo(result);
+          setDestinationUnknown(!result);
+          setLookingUp(null);
+        });
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Minor client-side validation
     if (form.originIata.length !== 3 || form.destinationIata.length !== 3) {
       setError("Airport codes must be exactly 3-character IATA codes (e.g. JFK).");
       return;
@@ -106,6 +139,27 @@ export default function NewFlightPlan() {
               className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50"
               disabled={isPending}
             />
+            {lookingUp === "origin" && (
+              <p className="text-xs text-white/40 flex items-center gap-1 mt-1">
+                <Loader2 className="h-3 w-3 animate-spin" /> Looking up...
+              </p>
+            )}
+            {originInfo && (
+              <div className="flex items-start gap-2 mt-1 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <MapPin className="h-3.5 w-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                <div className="text-xs">
+                  <span className="font-semibold text-emerald-300">{originInfo.name}</span>
+                  <span className="text-emerald-400/70"> — {originInfo.city}, {originInfo.country}</span>
+                  <span className="text-white/40 ml-1">(ICAO: {originInfo.icao})</span>
+                </div>
+              </div>
+            )}
+            {originUnknown && form.originIata.length === 3 && !lookingUp && (
+              <div className="flex items-center gap-2 mt-1 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                <span className="text-xs text-amber-300">Unknown IATA code — not found in global airport database</span>
+              </div>
+            )}
           </div>
 
           {/* Destination IATA */}
@@ -122,6 +176,27 @@ export default function NewFlightPlan() {
               className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50"
               disabled={isPending}
             />
+            {lookingUp === "destination" && (
+              <p className="text-xs text-white/40 flex items-center gap-1 mt-1">
+                <Loader2 className="h-3 w-3 animate-spin" /> Looking up...
+              </p>
+            )}
+            {destinationInfo && (
+              <div className="flex items-start gap-2 mt-1 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <MapPin className="h-3.5 w-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                <div className="text-xs">
+                  <span className="font-semibold text-emerald-300">{destinationInfo.name}</span>
+                  <span className="text-emerald-400/70"> — {destinationInfo.city}, {destinationInfo.country}</span>
+                  <span className="text-white/40 ml-1">(ICAO: {destinationInfo.icao})</span>
+                </div>
+              </div>
+            )}
+            {destinationUnknown && form.destinationIata.length === 3 && !lookingUp && (
+              <div className="flex items-center gap-2 mt-1 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                <span className="text-xs text-amber-300">Unknown IATA code — not found in global airport database</span>
+              </div>
+            )}
           </div>
 
           {/* Aircraft Registration */}

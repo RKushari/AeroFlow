@@ -71,7 +71,23 @@ export type Session = {
 
 export async function getSession(): Promise<Session | null> {
   const session = await getServerSession(authOptions);
-  return session as Session | null;
+  if (!session?.user?.email) return null;
+
+  // Resolve the real DB user ID by email (token.sub may not match the DB id)
+  const dbUser = await db.users.findUnique({
+    where: { email: session.user.email },
+    select: { id: true, role: true, name: true, email: true },
+  });
+  if (!dbUser) return null;
+
+  return {
+    user: {
+      id: dbUser.id,
+      email: dbUser.email,
+      name: dbUser.name,
+      role: dbUser.role,
+    },
+  };
 }
 
 export function getDashboardForRole(role: Role): string {

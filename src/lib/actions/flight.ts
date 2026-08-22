@@ -28,6 +28,7 @@ export async function approveDispatch(flightId: string) {
 
   revalidatePath(`/dispatcher/flight/${flightId}`);
   revalidatePath('/dispatcher/dashboard');
+  revalidatePath('/');
   return result;
 }
 
@@ -65,5 +66,6 @@ export async function overrideDispatch(flightId: string, justification: string) 
 
   revalidatePath(`/dispatcher/flight/${flightId}`);
   revalidatePath('/dispatcher/dashboard');
+  revalidatePath('/');
   return result;
 }

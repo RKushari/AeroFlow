@@ -140,7 +140,9 @@ export async function getDashboardStats() {
     try { monitoredIds = JSON.parse(config.value); } catch {}
   }
 
-  const flightsCount = monitoredIds?.length ?? await db.flights.count();
+  const flightsCount = await db.flights.count({
+    where: { status: { notIn: ['CANCELLED', 'DEPARTED'] } }
+  });
 
   // Ensure risk rows exist (generates alert logs for elevated-risk flights on first run)
   if (monitoredIds && monitoredIds.length > 0) {

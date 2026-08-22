@@ -1,4 +1,4 @@
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { db } from './db';
 import { FlightStatus } from '@prisma/client';
 
@@ -13,7 +13,7 @@ export async function generateFlightDossier(flightId: string) {
       checklists: { include: { items: true } },
       crewUsers: true,
       dispatchPlan: {
-        include: { approval: true }
+        include: { approval: { include: { dispatcher: true } } }
       }
     }
   });
@@ -21,24 +21,23 @@ export async function generateFlightDossier(flightId: string) {
   if (!flight) throw new Error('Flight not found');
 
   const doc = await PDFDocument.create();
-  const page = doc.addPage([600, 800]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  let page = doc.addPage([600, 800]);
   let y = 750;
   const lineHeight = 18;
   const sectionGap = 10;
 
   const drawLine = (text: string, size = 12, color = rgb(0, 0, 0)) => {
     if (y < 50) {
-      // Add a new page if we run out of space
-      const newPage = doc.addPage([600, 800]);
+      page = doc.addPage([600, 800]);
       y = 750;
-      newPage.drawText(text, { x: 50, y, size, color });
-      y -= lineHeight;
-      return newPage;
     }
-    page.drawText(text, { x: 50, y, size, color });
+    page.drawText(text, { x: 50, y, size, font, color });
     y -= lineHeight;
-    return page;
   };
+
+  const sanitize = (text: string) =>
+    text.replace(/[^\x20-\x7E]/g, '?');
 
   // Title
   drawLine('AeroFlow Safety Dossier', 22);
@@ -46,7 +45,7 @@ export async function generateFlightDossier(flightId: string) {
 
   // Flight Info
   drawLine(`Flight Number: ${flight.flightNumber}`, 14);
-  drawLine(`Route: ${flight.route.originId} → ${flight.route.destinationId}`, 14);
+  drawLine(`Route: ${flight.route.originId} -> ${flight.route.destinationId}`, 14);
   drawLine(`Status: ${flight.status}`, 14);
   y -= sectionGap;
 
@@ -71,7 +70,7 @@ export async function generateFlightDossier(flightId: string) {
   if (flight.crewUsers.length > 0) {
     drawLine('--- Assigned Crew ---', 13, rgb(0, 0.5, 0));
     flight.crewUsers.forEach(u => {
-      drawLine(`• ${u.name} (${u.role})`);
+      drawLine(`- ${sanitize(u.name)} (${u.role})`);
     });
     y -= sectionGap;
   }
@@ -81,9 +80,9 @@ export async function generateFlightDossier(flightId: string) {
     drawLine('--- Pre-Flight Checklists ---', 13, rgb(0.5, 0, 0.5));
     flight.checklists.forEach(cl => {
       cl.items.forEach(item => {
-        const status = item.isComplete ? '✓' : '✗';
+        const status = item.isComplete ? '[x]' : '[ ]';
         const mandatory = item.isMandatory ? ' [MANDATORY]' : '';
-        drawLine(`  ${status} ${item.task}${mandatory}`);
+        drawLine(`  ${status} ${sanitize(item.task)}${mandatory}`);
       });
     });
     y -= sectionGap;
@@ -92,9 +91,8 @@ export async function generateFlightDossier(flightId: string) {
   // Safety Briefing
   if (flight.briefings.length > 0) {
     drawLine('--- Approved Safety Briefing ---', 13, rgb(0, 0, 0.6));
-    const briefingText = flight.briefings[0].finalContent || flight.briefings[0].draftContent;
-    // Split long text into lines (max ~70 chars per line)
-    const words = briefingText.split(' ');
+    const briefingText = flight.briefings[0].finalContent || flight.briefings[0].draftContent || '';
+    const words = sanitize(briefingText).split(' ');
     let currentLine = '';
     words.forEach((word: string) => {
       if ((currentLine + ' ' + word).length > 70) {
@@ -108,9 +106,19 @@ export async function generateFlightDossier(flightId: string) {
     y -= sectionGap;
   }
 
+  // Dispatch Approval
+  if (flight.dispatchPlan?.approval) {
+    drawLine('--- Dispatch Approval ---', 13, rgb(0, 0, 0.6));
+    drawLine(`Dispatcher: ${sanitize(flight.dispatchPlan.approval.dispatcher.name)}`);
+    drawLine(`Token: ${flight.dispatchPlan.approval.id}`);
+    drawLine(`Approved At: ${flight.dispatchPlan.approval.approvedAt.toISOString()}`);
+    y -= sectionGap;
+  }
+
   // Dispatch Sign-off
   if (flight.status === FlightStatus.DEPARTED && flight.dispatchPlan?.approval) {
     drawLine('--- Departure Sign-off ---', 13, rgb(0, 0.5, 0));
+    drawLine(`Dispatcher: ${sanitize(flight.dispatchPlan.approval.dispatcher.name)}`);
     drawLine(`Token: ${flight.dispatchPlan.approval.id}`);
     drawLine(`Approved At: ${flight.dispatchPlan.approval.approvedAt.toISOString()}`);
   }

@@ -6,6 +6,28 @@ import { validateFlightDetails } from "../aviation-edge";
 import { logAudit } from "../audit/ledger";
 import { FlightStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { getAirportByIata } from "../data/airports";
+
+export interface AirportLookupResult {
+  code: string;
+  name: string;
+  city: string;
+  country: string;
+  icao: string;
+}
+
+export async function lookupAirport(iata: string): Promise<AirportLookupResult | null> {
+  if (!iata || iata.length !== 3) return null;
+  const airport = getAirportByIata(iata.toUpperCase());
+  if (!airport) return null;
+  return {
+    code: airport.code,
+    name: airport.name,
+    city: airport.city,
+    country: airport.country,
+    icao: airport.icao,
+  };
+}
 
 export interface CreateFlightInput {
   flightNumber: string;

@@ -1,28 +1,37 @@
 import { db } from "@/lib/db";
-import { approveDispatch, overrideDispatch } from "@/lib/actions/flight";
+import { overrideDispatch } from "@/lib/actions/flight";
 import { requireRole, getSession } from "@/lib/auth";
 import { getRiskThreshold } from "@/lib/config";
 import { RefreshWeatherButton } from "@/components/refresh-weather-button";
+import { ApproveDispatchButton } from "@/components/approve-dispatch-button";
 
 export const dynamic = 'force-dynamic';
 
-export default async function FlightDetails({ params }: { params: { id: string } }) {
+export default async function FlightDetails({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   await requireRole(['FLIGHT_DISPATCHER', 'OPERATIONS_DIRECTOR']);
 
   const flight = await db.flights.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       route: true,
       risk: true,
       weather: { orderBy: { id: 'desc' }, take: 1 },
       briefings: { where: { deletedAt: null }, orderBy: { id: 'desc' } },
+      checklists: { include: { items: true } },
     }
   });
 
   const timeline = await db.auditLedger.findMany({
-    where: { resourceId: params.id },
+    where: { resourceId: id },
     orderBy: { timestamp: 'desc' },
     take: 20,
+  });
+
+  const exportsHistory = await db.pdfExports.findMany({
+    where: { flightId: id },
+    include: { user: true },
+    orderBy: { createdAt: 'desc' },
   });
 
   const session = await getSession();
@@ -34,6 +43,10 @@ export default async function FlightDetails({ params }: { params: { id: string }
 
   const threshold = await getRiskThreshold();
   const isCritical = flight.risk ? flight.risk.totalScore >= threshold : false;
+
+  const allMandatoryComplete = flight.checklists.every(cl =>
+    cl.items.filter(item => item.isMandatory).every(item => item.isComplete)
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -47,19 +60,12 @@ export default async function FlightDetails({ params }: { params: { id: string }
           <a href={`/api/export?flightId=${flight.id}`} target="_blank" className="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg text-sm font-medium transition-colors">
             Export Dossier (PDF)
           </a>
-          {/* Dispatch Form Server Action */}
-          <form action={async () => {
-            'use server';
-            await approveDispatch(flight.id);
-          }}>
-            <button 
-              type="submit" 
-              disabled={isCritical}
-              className={`px-4 py-2 rounded-lg text-sm font-bold text-white transition-colors ${isCritical ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-            >
-              Approve Dispatch
-            </button>
-          </form>
+          <ApproveDispatchButton
+            flightId={flight.id}
+            isCritical={isCritical}
+            allMandatoryComplete={allMandatoryComplete}
+            currentStatus={flight.status}
+          />
 
           {flight.status === 'READY' && (
             <form action={async () => {
@@ -67,8 +73,8 @@ export default async function FlightDetails({ params }: { params: { id: string }
               const { signoffDeparture } = await import('@/lib/actions/signoff');
               await signoffDeparture(flight.id);
             }}>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold"
               >
                 Confirm Departure (Sign-off)
@@ -129,7 +135,7 @@ export default async function FlightDetails({ params }: { params: { id: string }
               </button>
             </form>
           </div>
-          
+
           {flight.briefings.length > 0 ? (
             <div className="flex flex-col gap-4">
               <form action={async (formData: FormData) => {
@@ -142,7 +148,7 @@ export default async function FlightDetails({ params }: { params: { id: string }
                 revalidatePath(`/dispatcher/flight/${flight.id}`);
               }} className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-slate-500 uppercase">Latest Draft Content</label>
-                <textarea 
+                <textarea
                   name="finalContent"
                   className="w-full h-32 p-3 text-sm bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   defaultValue={flight.briefings[0].draftContent}
@@ -151,7 +157,7 @@ export default async function FlightDetails({ params }: { params: { id: string }
                   Commit Briefing
                 </button>
               </form>
-              
+
               {flight.briefings.length > 1 && (
                 <div className="border-t pt-4 mt-2">
                   <label className="text-xs font-semibold text-slate-500 uppercase mb-2 block">History</label>
@@ -182,28 +188,63 @@ export default async function FlightDetails({ params }: { params: { id: string }
         </section>
       </div>
 
-      {/* Flight Safety Timeline */}
-      <section className="p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
-        <h2 className="text-lg font-bold mb-4">Flight Safety Timeline</h2>
-        {timeline.length === 0 ? (
-          <div className="text-sm text-slate-400 text-center py-4">No events recorded for this flight yet.</div>
-        ) : (
-          <div className="relative border-l-2 border-slate-200 ml-4 space-y-4">
-            {timeline.map((event) => (
-              <div key={event.id} className="relative pl-6">
-                <div className="absolute -left-[9px] top-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white" />
-                <div className="text-xs text-slate-400">{new Date(event.timestamp).toLocaleString()}</div>
-                <div className="mt-1">
-                  <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-bold uppercase mr-2">
-                    {event.action}
-                  </span>
-                  <span className="text-sm text-slate-600">by {event.userId.slice(0, 8)}...</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Flight Safety Timeline */}
+        <section className="p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+          <h2 className="text-lg font-bold mb-4">Flight Safety Timeline</h2>
+          {timeline.length === 0 ? (
+            <div className="text-sm text-slate-400 text-center py-4">No events recorded for this flight yet.</div>
+          ) : (
+            <div className="relative border-l-2 border-slate-200 ml-4 space-y-4">
+              {timeline.map((event) => (
+                <div key={event.id} className="relative pl-6">
+                  <div className="absolute -left-[9px] top-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white" />
+                  <div className="text-xs text-slate-400">{new Date(event.timestamp).toLocaleString()}</div>
+                  <div className="mt-1">
+                    <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-bold uppercase mr-2">
+                      {event.action}
+                    </span>
+                    <span className="text-sm text-slate-600">by {event.userId.slice(0, 8)}...</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Export History */}
+        <section className="p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+          <h2 className="text-lg font-bold mb-4">Export History</h2>
+          {exportsHistory.length === 0 ? (
+            <div className="text-sm text-slate-400 text-center py-4">No manifests generated yet.</div>
+          ) : (
+            <ul className="space-y-3">
+              {exportsHistory.map((exp) => (
+                <li key={exp.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+                  <div>
+                    <div className="text-sm font-medium">Export by {exp.user?.name || exp.userId.slice(0, 8)}</div>
+                    <div className="text-xs text-slate-500">{new Date(exp.createdAt).toLocaleString()}</div>
+                  </div>
+                  <div className="flex gap-3 mt-2 sm:mt-0">
+                    <a href={`/api/export/${exp.id}`} target="_blank" className="text-xs font-bold text-blue-600 hover:underline">
+                      Download
+                    </a>
+                    <form action={async () => {
+                      'use server';
+                      const { deletePdfExport } = await import('@/lib/actions/exports');
+                      await deletePdfExport(exp.id, flight.id);
+                    }}>
+                      <button type="submit" className="text-xs font-bold text-red-600 hover:underline">
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
