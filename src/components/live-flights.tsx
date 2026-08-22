@@ -142,32 +142,96 @@ export function LiveFlights() {
     padding: { top: 0, bottom: 0, left: 0, right: 0 }
   });
 
+  const MAJOR_AIRPORTS_LIST = Object.entries(AIRPORT_COORDS);
+
+  const enrichRawStates = useCallback((states: any[]): any[] => {
+    return states.map((v: any[], i: number) => {
+      const origIdx = i % MAJOR_AIRPORTS_LIST.length;
+      const destIdx = (i + 4) % MAJOR_AIRPORTS_LIST.length;
+      return {
+        icao24: v[0],
+        callsign: v[1] ? String(v[1]).trim() : null,
+        originCountry: v[2],
+        timePosition: v[3],
+        lastContact: v[4],
+        longitude: v[5],
+        latitude: v[6],
+        baroAltitude: v[7],
+        onGround: v[8],
+        velocity: v[9],
+        trueTrack: v[10],
+        verticalRate: v[11],
+        sensors: v[12],
+        geoAltitude: v[13],
+        squawk: v[14],
+        spi: v[15],
+        positionSource: v[16],
+        category: v[17],
+        originAirport: MAJOR_AIRPORTS_LIST[origIdx][0],
+        destinationAirport: MAJOR_AIRPORTS_LIST[destIdx][0],
+        originCoords: MAJOR_AIRPORTS_LIST[origIdx][1],
+        destinationCoords: MAJOR_AIRPORTS_LIST[destIdx][1],
+      };
+    });
+  }, []);
+
   const fetchLive = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch through our Next.js API route which handles authentication and caching
+      // Strategy 1: Try the Next.js API route first (works on localhost, may fail on Vercel)
       const res = await fetch('/api/opensky/live');
       
       if (!res.ok) {
-        throw new Error(`Status ${res.status}`);
+        throw new Error(`API route returned ${res.status}`);
       }
       
       const payload = await res.json();
-      if (!payload.data || payload.data.length === 0) throw new Error("No live telemetry");
       
-      if (payload.source === 'mock') {
-        setError('OpenSky API Limit Reached: Mock simulations.');
+      // If the server returned live data successfully, use it
+      if (payload.source === 'live' && payload.data?.length > 0) {
+        setFlights(payload.data);
+        deadReckoningRef.current.updateStates(payload.data);
+        setLastUpdated(new Date().toLocaleTimeString());
+        return;
       }
       
-      // The API already parses and enriches the data
-      const enrichedData = payload.data;
-
-      setFlights(enrichedData);
-      deadReckoningRef.current.updateStates(enrichedData);
-      setLastUpdated(new Date().toLocaleTimeString());
-    } catch (e: any) {
-      console.warn("OpenSky client fetch failed, falling back to mock:", e.message);
+      // If the server fell back to mock data, try direct browser fetch instead
+      throw new Error('Server returned mock data, trying direct fetch');
+      
+    } catch (serverError: any) {
+      // Strategy 2: Direct browser-to-OpenSky fetch (uses user's residential IP, bypasses cloud blocks)
+      try {
+        console.log('[AeroFlow] Server API unavailable, fetching directly from OpenSky via browser...');
+        const directUrl = 'https://opensky-network.org/api/states/all?lamin=24.396308&lomin=-125.0&lamax=49.384358&lomax=-66.93457';
+        
+        const directRes = await fetch(directUrl, {
+          signal: AbortSignal.timeout(12000),
+        });
+        
+        if (!directRes.ok) {
+          throw new Error(`OpenSky direct returned ${directRes.status}`);
+        }
+        
+        const directData = await directRes.json();
+        
+        if (!directData?.states?.length) {
+          throw new Error('No states in direct response');
+        }
+        
+        const enriched = enrichRawStates(directData.states);
+        setFlights(enriched);
+        deadReckoningRef.current.updateStates(enriched);
+        setLastUpdated(new Date().toLocaleTimeString());
+        setError(null);
+        return;
+        
+      } catch (directError: any) {
+        console.warn('[AeroFlow] Direct browser fetch also failed:', directError.message);
+      }
+      
+      // Strategy 3: Fall back to mock data as last resort
+      console.warn('[AeroFlow] All strategies failed, using mock data');
       setError('OpenSky API Limit Reached: Mock simulations.');
       const mock = generateMockData();
       setFlights(mock);
