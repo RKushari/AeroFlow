@@ -131,25 +131,38 @@ export async function GET(req: NextRequest) {
       lomax: lomax ? parseFloat(lomax) : -66.93457,
     };
 
-    // Build the upstream OpenSky URL
-    const openSkyParams = new URLSearchParams({
-      lamin: bbox.lamin.toString(),
-      lomin: bbox.lomin.toString(),
-      lamax: bbox.lamax.toString(),
-      lomax: bbox.lomax.toString(),
-    });
-    const openSkyUrl = `https://opensky-network.org/api/states/all?${openSkyParams}`;
-
-    // Build auth headers if credentials are available
+    // Build the upstream URL (either Proxy or OpenSky directly)
+    let openSkyUrl = '';
     let headers: Record<string, string> = {
       'User-Agent': 'AeroFlow-Telemetry-App/1.0',
       'Accept': 'application/json',
     };
-    const primaryClientId = process.env.OPENSKY_CLIENT_ID;
-    const primaryClientSecret = process.env.OPENSKY_CLIENT_SECRET;
-    if (primaryClientId && primaryClientSecret) {
-      // Use standard btoa instead of Buffer to ensure compatibility across all Vercel runtimes
-      headers['Authorization'] = `Basic ${btoa(`${primaryClientId}:${primaryClientSecret}`)}`;
+
+    if (process.env.OPENSKY_PROXY_URL) {
+      // If a proxy URL is configured (e.g. Render/Railway), use it
+      const proxyParams = new URLSearchParams({
+        lamin: bbox.lamin.toString(),
+        lomin: bbox.lomin.toString(),
+        lamax: bbox.lamax.toString(),
+        lomax: bbox.lomax.toString(),
+      });
+      openSkyUrl = `${process.env.OPENSKY_PROXY_URL}?${proxyParams}`;
+      // Note: The proxy handles the OpenSky authentication itself
+    } else {
+      // Direct OpenSky Connection (works on Localhost, fails on Vercel AWS)
+      const openSkyParams = new URLSearchParams({
+        lamin: bbox.lamin.toString(),
+        lomin: bbox.lomin.toString(),
+        lamax: bbox.lamax.toString(),
+        lomax: bbox.lomax.toString(),
+      });
+      openSkyUrl = `https://opensky-network.org/api/states/all?${openSkyParams}`;
+
+      const primaryClientId = process.env.OPENSKY_CLIENT_ID;
+      const primaryClientSecret = process.env.OPENSKY_CLIENT_SECRET;
+      if (primaryClientId && primaryClientSecret) {
+        headers['Authorization'] = `Basic ${btoa(`${primaryClientId}:${primaryClientSecret}`)}`;
+      }
     }
 
     // ============================================================
