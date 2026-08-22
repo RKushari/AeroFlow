@@ -1,9 +1,11 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // Enums
@@ -38,222 +40,228 @@ enum MessagePriority {
 
 // Entities
 model Users {
-  id String @id @default(uuid())
-  role Role
-  email String @unique
-  name String
-  password String?
-  phone String?
-  shiftLogs ShiftLogs[]
-  incidents Incidents[]
-  approvals DispatchApprovals[]
+  id              String                @id @default(uuid())
+  role            Role
+  email           String                @unique
+  name            String
+  password        String?
+  phone           String?
+  shiftLogs       ShiftLogs[]
+  incidents       Incidents[]
+  approvals       DispatchApprovals[]
   assignedFlights Flights[]
-  preferences DashboardPreferences?
-}
-
-model Roles {
-  id String @id @default(uuid())
-  name String @unique
+  preferences     DashboardPreferences?
+  pdfExports      PdfExports[]
+  broadcastMessages BroadcastMessages[]
+  manualOverrides   ManualOverrides[]
 }
 
 model Flights {
-  id String @id @default(uuid())
-  flightNumber String
-  status FlightStatus
-  routeId String
-  route RouteProfiles @relation(fields: [routeId], references: [id])
-  dispatchPlan DispatchPlans?
-  checklists FlightChecklists[]
-  weather WeatherRecords[]
-  incidents Incidents[]
-  crewUsers Users[]
-  risk RiskCalculations?
-  briefings SafetyBriefings[]
+  id              String             @id @default(uuid())
+  flightNumber    String
+  status          FlightStatus
+  routeId         String
+  route           RouteProfiles      @relation(fields: [routeId], references: [id])
+  dispatchPlan    DispatchPlans?
+  checklists      FlightChecklists[]
+  weather         WeatherRecords[]
+  incidents       Incidents[]
+  crewUsers       Users[]
+  risk            RiskCalculations?
+  briefings       SafetyBriefings[]
   groundEquipment GroundEquipment[]
+  pdfExports      PdfExports[]
+  manualOverrides ManualOverrides[]
 }
 
 model DispatchPlans {
-  id String @id @default(uuid())
-  flightId String @unique
-  flight Flights @relation(fields: [flightId], references: [id])
+  id       String             @id @default(uuid())
+  flightId String             @unique
+  flight   Flights            @relation(fields: [flightId], references: [id])
   approval DispatchApprovals?
 }
 
 model FlightChecklists {
-  id String @id @default(uuid())
-  flightId String
-  flight Flights @relation(fields: [flightId], references: [id])
-  items ChecklistItems[]
-  isComplete Boolean @default(false)
+  id         String           @id @default(uuid())
+  flightId   String
+  flight     Flights          @relation(fields: [flightId], references: [id])
+  items      ChecklistItems[]
+  isComplete Boolean          @default(false)
 }
 
 model ChecklistItems {
-  id String @id @default(uuid())
+  id          String           @id @default(uuid())
   checklistId String
-  checklist FlightChecklists @relation(fields: [checklistId], references: [id])
-  task String
-  isMandatory Boolean @default(true)
-  isComplete Boolean @default(false)
+  checklist   FlightChecklists @relation(fields: [checklistId], references: [id])
+  task        String
+  isMandatory Boolean          @default(true)
+  isComplete  Boolean          @default(false)
 }
 
 model GroundEquipment {
-  id String @id @default(uuid())
-  identifier String
-  type String
-  status Severity
-  flightId String?  @map("flight_id")
-  flight Flights? @relation(fields: [flightId], references: [id])
+  id              String                     @id @default(uuid())
+  identifier      String
+  type            String
+  status          Severity
+  flightId        String?                    @map("flight_id")
+  flight          Flights?                   @relation(fields: [flightId], references: [id])
   maintenanceLogs EquipmentMaintenanceLogs[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @default(now()) @updatedAt
 }
 
 model EquipmentMaintenanceLogs {
-  id String @id @default(uuid())
+  id          String          @id @default(uuid())
   equipmentId String
-  equipment GroundEquipment @relation(fields: [equipmentId], references: [id])
-  notes String
-  createdAt DateTime @default(now())
+  equipment   GroundEquipment @relation(fields: [equipmentId], references: [id])
+  notes       String
+  createdAt   DateTime        @default(now())
 }
 
 model ShiftLogs {
-  id String @id @default(uuid())
-  userId String
-  user Users @relation(fields: [userId], references: [id])
-  startTime DateTime
-  endTime DateTime?
+  id           String    @id @default(uuid())
+  userId       String
+  user         Users     @relation(fields: [userId], references: [id])
+  startTime    DateTime
+  endTime      DateTime?
   fatigueIndex Float
 }
 
 model WeatherRecords {
-  id String @id @default(uuid())
-  flightId String
-  flight Flights @relation(fields: [flightId], references: [id])
+  id            String  @id @default(uuid())
+  flightId      String
+  flight        Flights @relation(fields: [flightId], references: [id])
   severityIndex Float
-  rawData Json
+  rawData       Json
 }
 
 model WeatherApiCache {
-  id String @id @default(uuid())
-  airportCode String @unique
-  payload Json
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  airportCode String   @unique
+  payload     Json
+  updatedAt   DateTime @updatedAt
 }
 
 model Incidents {
-  id String @id @default(uuid())
-  flightId String
-  flight Flights @relation(fields: [flightId], references: [id])
+  id         String   @id @default(uuid())
+  flightId   String
+  flight     Flights  @relation(fields: [flightId], references: [id])
   reporterId String
-  reporter Users @relation(fields: [reporterId], references: [id])
-  severity Severity
-  resolved Boolean @default(false)
+  reporter   Users    @relation(fields: [reporterId], references: [id])
+  severity   Severity
+  resolved   Boolean  @default(false)
 }
 
 model AlertLogs {
-  id String @id @default(uuid())
-  message String
-  severity Severity
-  read Boolean @default(false)
+  id        String   @id @default(uuid())
+  message   String
+  severity  Severity
+  read      Boolean  @default(false)
   createdAt DateTime @default(now())
 }
 
 model DispatchApprovals {
-  id String @id @default(uuid())
-  planId String @unique
-  plan DispatchPlans @relation(fields: [planId], references: [id])
+  id           String        @id @default(uuid())
+  planId       String        @unique
+  plan         DispatchPlans @relation(fields: [planId], references: [id])
   dispatcherId String
-  dispatcher Users @relation(fields: [dispatcherId], references: [id])
-  approvedAt DateTime @default(now())
+  dispatcher   Users         @relation(fields: [dispatcherId], references: [id])
+  approvedAt   DateTime      @default(now())
 }
 
 model SafetyBriefings {
-  id String @id @default(uuid())
-  flightId String
-  flight Flights @relation(fields: [flightId], references: [id])
+  id           String    @id @default(uuid())
+  flightId     String
+  flight       Flights   @relation(fields: [flightId], references: [id])
   draftContent String
   finalContent String?
-  isApproved Boolean @default(false)
-  deletedAt DateTime?
+  isApproved   Boolean   @default(false)
+  deletedAt    DateTime?
 }
 
 model AuditLedger {
-  id String @id @default(uuid())
-  userId String
-  action String
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
   resourceId String
-  ipAddress String?
-  oldState Json?
-  newState Json?
-  timestamp DateTime @default(now())
+  ipAddress  String?
+  oldState   Json?
+  newState   Json?
+  timestamp  DateTime @default(now())
 }
 
 model DashboardPreferences {
-  id String @id @default(uuid())
-  userId String @unique
-  user Users @relation(fields: [userId], references: [id])
+  id           String @id @default(uuid())
+  userId       String @unique
+  user         Users  @relation(fields: [userId], references: [id])
   layoutConfig Json
 }
 
 model BroadcastMessages {
-  id String @id @default(uuid())
-  authorId String
-  content String
-  priority MessagePriority @default(LOW)
+  id        String          @id @default(uuid())
+  authorId  String
+  author    Users           @relation(fields: [authorId], references: [id])
+  content   String
+  priority  MessagePriority @default(LOW)
   expiresAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime        @default(now())
 }
 
 model FlaggedZones {
-  id String @id @default(uuid())
+  id          String @id @default(uuid())
   coordinates String
-  reason String
+  reason      String
 }
 
 model SavedFilters {
-  id String @id @default(uuid())
-  name String
+  id    String @id @default(uuid())
+  name  String
   query Json
 }
 
 model PdfExports {
-  id String @id @default(uuid())
-  flightId String
-  fileUrl String
+  id        String   @id @default(uuid())
+  flightId  String
+  flight    Flights  @relation(fields: [flightId], references: [id])
+  userId    String
+  user      Users    @relation(fields: [userId], references: [id])
+  fileUrl   String
   createdAt DateTime @default(now())
 }
 
 model RiskCalculations {
-  id String @id @default(uuid())
-  flightId String @unique
-  flight Flights @relation(fields: [flightId], references: [id])
-  totalScore Float
+  id            String   @id @default(uuid())
+  flightId      String   @unique
+  flight        Flights  @relation(fields: [flightId], references: [id])
+  totalScore    Float
   fatigueFactor Float
   weatherFactor Float
-  mechFactor Float
-  calculatedAt DateTime @default(now())
+  mechFactor    Float
+  calculatedAt  DateTime @default(now())
 }
 
 model RouteProfiles {
-  id String @id @default(uuid())
-  originId String
+  id            String    @id @default(uuid())
+  originId      String
   destinationId String
-  baseRisk Float
-  flights Flights[]
+  baseRisk      Float
+  flights       Flights[]
 }
 
 model AirportProfiles {
-  id String @id @default(uuid())
-  code String @unique
+  id               String @id @default(uuid())
+  code             String @unique
   weatherStationId String
 }
 
 model ManualOverrides {
-  id String @id @default(uuid())
-  flightId String
-  userId String
+  id            String   @id @default(uuid())
+  flightId      String
+  flight        Flights  @relation(fields: [flightId], references: [id])
+  userId        String
+  user          Users    @relation(fields: [userId], references: [id])
   justification String
-  createdAt DateTime @default(now())
+  createdAt     DateTime @default(now())
 }
 
 model SystemConfig {
