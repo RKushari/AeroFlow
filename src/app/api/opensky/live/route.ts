@@ -115,8 +115,6 @@ function generateMockData() {
   });
 }
 
-export const runtime = 'edge';
-
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
@@ -143,7 +141,10 @@ export async function GET(req: NextRequest) {
     const openSkyUrl = `https://opensky-network.org/api/states/all?${openSkyParams}`;
 
     // Build auth headers if credentials are available
-    let headers: Record<string, string> = {};
+    let headers: Record<string, string> = {
+      'User-Agent': 'AeroFlow-Telemetry-App/1.0',
+      'Accept': 'application/json',
+    };
     const primaryClientId = process.env.OPENSKY_CLIENT_ID;
     const primaryClientSecret = process.env.OPENSKY_CLIENT_SECRET;
     if (primaryClientId && primaryClientSecret) {
@@ -225,6 +226,7 @@ export async function GET(req: NextRequest) {
       source: 'mock',
       data: mockData,
       creditsRemaining: 0,
+      debugError: error.message, // Added for debugging on Vercel
     });
     response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
     return response;
