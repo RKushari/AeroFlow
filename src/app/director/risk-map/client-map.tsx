@@ -71,21 +71,11 @@ export function RiskMapClient({ airports, initialFlagged }: { airports: any[], i
               tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
               tileSize: 256,
               attribution: 'Tiles &copy; Esri'
-            },
-            'terrarium': {
-              type: 'raster-dem',
-              tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
-              tileSize: 256,
-              encoding: 'terrarium'
             }
           },
           layers: [
             { id: 'satellite-layer', type: 'raster', source: 'satellite' }
-          ],
-          terrain: {
-            source: 'terrarium',
-            exaggeration: 1.5
-          }
+          ]
         },
         center: [airports[0]?.lng || -73.7781, airports[0]?.lat || 40.6413],
         zoom: 13,

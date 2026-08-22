@@ -29,6 +29,7 @@ export default async function DirectorLayout({
         savedFilters={masterData.savedFilters}
         liveRouteHealth={masterData.liveRouteHealth}
       />
+      <div style={{ display: 'none' }}>{children}</div>
     </div>
   );
 }
