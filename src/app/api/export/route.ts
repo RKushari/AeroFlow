@@ -26,12 +26,16 @@ export async function GET(req: NextRequest) {
     const pdfBytes = await generateFlightDossier(flightId);
 
     // Audit log
-    await db.pdfExports.create({
-      data: {
-        flightId,
-        fileUrl: `/api/export?flightId=${flightId}`, // Store API path as reference
-      }
-    });
+    try {
+      await db.pdfExports.create({
+        data: {
+          flightId,
+          fileUrl: `/api/export?flightId=${flightId}`, // Store API path as reference
+        }
+      });
+    } catch (auditErr) {
+      console.warn("Could not log PDF export to DB:", auditErr);
+    }
 
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
@@ -41,6 +45,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('PDF Export Error:', error);
-    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'Failed to generate PDF' }, { status: 500 });
   }
 }
