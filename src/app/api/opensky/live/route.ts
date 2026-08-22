@@ -115,6 +115,54 @@ function generateMockData() {
   });
 }
 
+// ============================================================
+// OAuth2 Token Cache
+// OpenSky retired Basic auth in March 2026 and now requires
+// OAuth2 client credentials flow. We cache the token in memory.
+// ============================================================
+const OPENSKY_TOKEN_URL = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
+
+let cachedToken: { accessToken: string; expiresAt: number } | null = null;
+
+async function getOAuth2Token(clientId: string, clientSecret: string): Promise<string | null> {
+  // Return cached token if still valid (with 60s buffer)
+  if (cachedToken && Date.now() < cachedToken.expiresAt - 60000) {
+    return cachedToken.accessToken;
+  }
+
+  try {
+    const body = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+    });
+
+    const res = await fetch(OPENSKY_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.error(`[OPENSKY_AUTH] Token request failed: ${res.status} ${errText}`);
+      return null;
+    }
+
+    const data = await res.json();
+    cachedToken = {
+      accessToken: data.access_token,
+      expiresAt: Date.now() + (data.expires_in || 1800) * 1000,
+    };
+    console.log(`[OPENSKY_AUTH] Got OAuth2 token, expires in ${data.expires_in}s`);
+    return cachedToken.accessToken;
+  } catch (err: any) {
+    console.error('[OPENSKY_AUTH] Token exchange error:', err.message);
+    return null;
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
@@ -131,82 +179,61 @@ export async function GET(req: NextRequest) {
       lomax: lomax ? parseFloat(lomax) : -66.93457,
     };
 
-    // Build the upstream URL (either Proxy or OpenSky directly)
-    let openSkyUrl = '';
-    let headers: Record<string, string> = {
+    const openSkyParams = new URLSearchParams({
+      lamin: bbox.lamin.toString(),
+      lomin: bbox.lomin.toString(),
+      lamax: bbox.lamax.toString(),
+      lomax: bbox.lomax.toString(),
+    });
+    const openSkyUrl = `https://opensky-network.org/api/states/all?${openSkyParams}`;
+
+    // Build auth headers using OAuth2 Bearer token
+    const headers: Record<string, string> = {
       'User-Agent': 'AeroFlow-Telemetry-App/1.0',
       'Accept': 'application/json',
     };
 
-    if (process.env.OPENSKY_PROXY_URL) {
-      // If a proxy URL is configured (e.g. Render/Railway), use it
-      const proxyParams = new URLSearchParams({
-        lamin: bbox.lamin.toString(),
-        lomin: bbox.lomin.toString(),
-        lamax: bbox.lamax.toString(),
-        lomax: bbox.lomax.toString(),
-      });
-      openSkyUrl = `${process.env.OPENSKY_PROXY_URL}?${proxyParams}`;
-      // Note: The proxy handles the OpenSky authentication itself
-    } else {
-      // Direct OpenSky Connection (works on Localhost, fails on Vercel AWS)
-      const openSkyParams = new URLSearchParams({
-        lamin: bbox.lamin.toString(),
-        lomin: bbox.lomin.toString(),
-        lamax: bbox.lamax.toString(),
-        lomax: bbox.lomax.toString(),
-      });
-      openSkyUrl = `https://opensky-network.org/api/states/all?${openSkyParams}`;
-
-      const primaryClientId = process.env.OPENSKY_CLIENT_ID;
-      const primaryClientSecret = process.env.OPENSKY_CLIENT_SECRET;
-      if (primaryClientId && primaryClientSecret) {
-        headers['Authorization'] = `Basic ${btoa(`${primaryClientId}:${primaryClientSecret}`)}`;
+    // Try primary credentials first
+    const primaryClientId = process.env.OPENSKY_CLIENT_ID;
+    const primaryClientSecret = process.env.OPENSKY_CLIENT_SECRET;
+    if (primaryClientId && primaryClientSecret) {
+      const token = await getOAuth2Token(primaryClientId, primaryClientSecret);
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
     }
 
-    // ============================================================
-    // KEY FIX: Use native fetch with Next.js Data Cache.
-    // 
-    // `next: { revalidate: 45 }` tells Next.js to cache the
-    // upstream OpenSky response for 45 seconds in its persistent
-    // Data Cache. This cache survives Vercel cold starts.
-    //
-    // This means OpenSky is hit AT MOST once every 45 seconds
-    // globally across ALL users, instead of once per request.
-    // ============================================================
-    
     let upstreamRes = await fetch(openSkyUrl, {
       headers,
       next: { revalidate: 45 },
-      signal: AbortSignal.timeout(8000), // 8s hard timeout to prevent Vercel 10s limits
+      signal: AbortSignal.timeout(10000),
     });
 
-    // Backup API Credentials
+    // If primary fails, try backup credentials with a fresh token
     if (!upstreamRes.ok && (upstreamRes.status === 429 || upstreamRes.status === 401 || upstreamRes.status === 403)) {
-      console.warn(`[OPENSKY] Primary API failed with status ${upstreamRes.status}. Retrying with backup credentials...`);
+      console.warn(`[OPENSKY] Primary failed with ${upstreamRes.status}, trying backup...`);
+      
       const backupClientId = process.env.OPENSKY_BACKUP_CLIENT_ID;
       const backupClientSecret = process.env.OPENSKY_BACKUP_CLIENT_SECRET;
-      
       if (backupClientId && backupClientSecret) {
-        headers['Authorization'] = `Basic ${btoa(`${backupClientId}:${backupClientSecret}`)}`;
-        
-        upstreamRes = await fetch(openSkyUrl, {
-          headers,
-          next: { revalidate: 45 },
-          signal: AbortSignal.timeout(8000),
-        });
+        // Force a fresh token for backup credentials
+        cachedToken = null;
+        const backupToken = await getOAuth2Token(backupClientId, backupClientSecret);
+        if (backupToken) {
+          headers['Authorization'] = `Bearer ${backupToken}`;
+          upstreamRes = await fetch(openSkyUrl, {
+            headers,
+            next: { revalidate: 45 },
+            signal: AbortSignal.timeout(10000),
+          });
+        }
       }
     }
 
     if (!upstreamRes.ok) {
       const errorText = await upstreamRes.text().catch(() => 'No body');
       console.error(`[OPENSKY_ERROR] Status: ${upstreamRes.status} ${upstreamRes.statusText}`);
-      console.error(`[OPENSKY_ERROR] Headers:`, Object.fromEntries(upstreamRes.headers.entries()));
       console.error(`[OPENSKY_ERROR] Body: ${errorText}`);
-      if (upstreamRes.status === 429) {
-        throw new Error('429 Rate Limit on Backup API');
-      }
       throw new Error(`OpenSky returned ${upstreamRes.status}: ${errorText}`);
     }
 
@@ -219,9 +246,6 @@ export async function GET(req: NextRequest) {
     const states = data.states.map((v: any[]) => parseStateVector(v));
     const enriched = enrichStates(states);
 
-    // Return with CDN cache headers so Vercel's edge caches this response
-    // s-maxage=45: CDN caches for 45 seconds
-    // stale-while-revalidate=300: serve stale data for up to 5 minutes while refreshing
     const response = NextResponse.json({
       source: 'live',
       data: enriched,
@@ -233,15 +257,15 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error('OpenSky fetch failed, falling back to mock:', error.message);
 
-    // Return mock data with a shorter cache so it retries sooner
     const mockData = generateMockData();
     const response = NextResponse.json({
       source: 'mock',
       data: mockData,
       creditsRemaining: 0,
-      debugError: error.message, // Added for debugging on Vercel
+      debugError: error.message,
     });
     response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
     return response;
   }
 }
+
