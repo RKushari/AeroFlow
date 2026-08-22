@@ -1,5 +1,5 @@
 const DEFAULT_LAYOUT = ['incidents', 'risk', 'fatigue', 'checklists'] as const;
-const VALID_WIDGETS = new Set(DEFAULT_LAYOUT);
+const VALID_WIDGETS = new Set<string>(DEFAULT_LAYOUT);
 
 export function normalizeDashboardLayout(layout?: string[] | null): string[] {
   if (!Array.isArray(layout) || layout.length === 0) {

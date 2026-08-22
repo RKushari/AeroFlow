@@ -77,8 +77,9 @@ export function TopNav({ session }: TopNavProps) {
                   onMouseEnter={() => handleWarmup(item.href)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
                     isActive
-                      ? item.activeBg
-                      : 'text-slate-300 border-transparent hover:bg-slate-900/80 ' + item.color
+                      ? (item as any).activeBg || 'bg-blue-600/30 text-blue-300 border-blue-500/50'
+                      : 'text-slate-300 border-transparent hover:bg-slate-900/80 ' + ((item as any).color || '')
+                  }
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />

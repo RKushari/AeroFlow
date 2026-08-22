@@ -81,7 +81,7 @@ export type Session = {
 export const getSession = cache(async (): Promise<Session | null> => {
   try {
     const session = await getServerSession(authOptions);
-    if (session) return session as Session;
+    if (session) return session as unknown as Session;
   } catch (e) {
     console.warn("getSession error:", e);
   }
