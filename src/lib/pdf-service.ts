@@ -67,31 +67,64 @@ export async function generateFlightDossier(flightId: string) {
     y -= lineHeight;
   };
 
-  const drawParagraph = (rawParagraph: string, size = 10, color = rgb(0.15, 0.15, 0.15)) => {
+  const drawParagraph = (rawParagraph: string, defaultSize = 10, defaultColor = rgb(0.15, 0.15, 0.15)) => {
     if (!rawParagraph) return;
     const lines = rawParagraph.split('\n');
 
     lines.forEach(rawLineStr => {
-      const lineStr = sanitizeWinAnsi(rawLineStr);
+      let lineStr = sanitizeWinAnsi(rawLineStr);
       if (!lineStr) {
-        y -= 4; // Spacing for empty lines / paragraph breaks
+        y -= 4; // Spacing for empty lines
         return;
       }
 
-      const words = lineStr.split(' ');
-      let currentLine = '';
+      // Check for Markdown Horizontal Rule
+      if (lineStr === '---' || lineStr === '***' || lineStr === '___') {
+        y -= 6;
+        return;
+      }
+
+      // Check for Markdown H3 Header
+      if (lineStr.startsWith('### ')) {
+        const headerText = lineStr.replace(/^###\s+/, '').replace(/\*\*/g, '');
+        y -= 4;
+        drawLine(headerText, 11, rgb(0.1, 0.25, 0.5));
+        return;
+      }
+
+      // Check for Markdown H1 / H2 Header
+      if (lineStr.startsWith('# ') || lineStr.startsWith('## ')) {
+        const headerText = lineStr.replace(/^#+\s+/, '').replace(/\*\*/g, '');
+        y -= 4;
+        drawLine(headerText, 12, rgb(0.05, 0.2, 0.45));
+        return;
+      }
+
+      // Check for Markdown Bullet List
+      let isBullet = false;
+      if (lineStr.startsWith('* ') || lineStr.startsWith('- ')) {
+        isBullet = true;
+        lineStr = lineStr.replace(/^[\*\-]\s+/, '');
+      }
+
+      // Strip all remaining ** bold asterisks
+      const cleanLine = lineStr.replace(/\*\*/g, '');
+      const prefix = isBullet ? '* ' : '';
+
+      const words = cleanLine.split(' ');
+      let currentLine = prefix;
 
       words.forEach(word => {
         if ((currentLine + ' ' + word).length > 72) {
-          drawLine(currentLine.trim(), size, color);
-          currentLine = word;
+          drawLine(currentLine.trim(), defaultSize, defaultColor);
+          currentLine = isBullet ? '  ' + word : word;
         } else {
           currentLine = currentLine ? `${currentLine} ${word}` : word;
         }
       });
 
       if (currentLine.trim()) {
-        drawLine(currentLine.trim(), size, color);
+        drawLine(currentLine.trim(), defaultSize, defaultColor);
       }
     });
   };
