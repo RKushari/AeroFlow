@@ -67,3 +67,19 @@ export async function overrideDispatch(flightId: string, justification: string) 
   revalidatePath('/dispatcher/dashboard');
   return result;
 }
+
+export async function approveDispatchFormAction(formData: FormData) {
+  const flightId = formData.get('flightId') as string;
+  if (flightId) {
+    await approveDispatch(flightId);
+  }
+}
+
+export async function overrideDispatchFormAction(formData: FormData) {
+  const flightId = formData.get('flightId') as string;
+  const justification = (formData.get('justification') as string) || 'Emergency Override';
+  if (flightId) {
+    await overrideDispatch(flightId, justification);
+  }
+}
+

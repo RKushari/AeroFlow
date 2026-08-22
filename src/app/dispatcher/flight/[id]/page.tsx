@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { approveDispatch, overrideDispatch } from "@/lib/actions/flight";
+import { approveDispatchFormAction, overrideDispatchFormAction } from "@/lib/actions/flight";
+import { signoffDepartureFormAction } from "@/lib/actions/signoff";
 import { requireRole, getSession } from "@/lib/auth";
 import { getRiskThreshold } from "@/lib/config";
 import { RefreshWeatherButton } from "@/components/refresh-weather-button";
@@ -109,10 +110,8 @@ export default async function FlightDetails({ params }: { params: Promise<{ id: 
           </a>
           
           {/* Dispatch Form Server Action */}
-          <form action={async () => {
-            'use server';
-            await approveDispatch(flight.id);
-          }}>
+          <form action={approveDispatchFormAction}>
+            <input type="hidden" name="flightId" value={flight.id} />
             <button 
               type="submit" 
               disabled={isCritical}
@@ -125,11 +124,8 @@ export default async function FlightDetails({ params }: { params: Promise<{ id: 
           </form>
 
           {flight.status === 'READY' && (
-            <form action={async () => {
-              'use server';
-              const { signoffDeparture } = await import('@/lib/actions/signoff');
-              await signoffDeparture(flight.id);
-            }}>
+            <form action={signoffDepartureFormAction}>
+              <input type="hidden" name="flightId" value={flight.id} />
               <button 
                 type="submit" 
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
@@ -140,11 +136,8 @@ export default async function FlightDetails({ params }: { params: Promise<{ id: 
           )}
 
           {isCritical && isDirector && (
-            <form action={async (formData: FormData) => {
-              'use server';
-              const justification = formData.get('justification') as string;
-              await overrideDispatch(flight.id, justification || 'Emergency Override');
-            }} className="flex gap-2">
+            <form action={overrideDispatchFormAction} className="flex gap-2">
+              <input type="hidden" name="flightId" value={flight.id} />
               <input 
                 type="text" 
                 name="justification" 

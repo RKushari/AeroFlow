@@ -69,6 +69,14 @@ export async function completeChecklistItem(itemId: string) {
   });
 }
 
+export async function completeChecklistItemFormAction(formData: FormData) {
+  const itemId = formData.get('itemId') as string;
+  if (itemId) {
+    await completeChecklistItem(itemId);
+  }
+}
+
+
 import { calculateFatigueIndex } from '../fatigue';
 
 export async function submitShiftLog(

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { completeChecklistItem, getUserShiftLogs } from "@/lib/actions/crew";
+import { completeChecklistItemFormAction, getUserShiftLogs } from "@/lib/actions/crew";
 import { seedDummyEquipment, logEquipmentMaintenance } from "@/lib/actions/equipment";
 import { Preflight3DChecklist } from "@/components/preflight-3d-checklist";
 import { ShiftLoggerClient } from "./shift-logger-client";
@@ -130,10 +130,8 @@ export default async function CrewDashboard() {
                       <div key={checklist.id} className="ml-1 mb-4 space-y-2">
                         {checklist.items?.map((item: any) => (
                           <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-950/70 border border-slate-800 text-xs font-mono">
-                            <form action={async () => {
-                              'use server';
-                              await completeChecklistItem(item.id);
-                            }}>
+                            <form action={completeChecklistItemFormAction}>
+                              <input type="hidden" name="itemId" value={item.id} />
                               <button 
                                 type="submit" 
                                 disabled={item.isComplete}

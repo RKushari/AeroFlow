@@ -38,3 +38,11 @@ export async function signoffDeparture(flightId: string) {
   // (The transition function validates that we are in READY state and that the approval exists)
   await transitionFlight(parsed.flightId, FlightStatus.DEPARTED, session.user.id);
 }
+
+export async function signoffDepartureFormAction(formData: FormData) {
+  const flightId = formData.get('flightId') as string;
+  if (flightId) {
+    await signoffDeparture(flightId);
+  }
+}
+
